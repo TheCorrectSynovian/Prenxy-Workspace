@@ -1,0 +1,555 @@
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+const fsp = require('fs/promises');
+const multer = require('multer');
+const archiver = require('archiver');
+const os = require('os');
+const { promisify } = require('util');
+const { execFile } = require('child_process');
+
+const app = express();
+const PORT = 3000;
+const DOCUMENTS_DIR = path.join(__dirname, 'documents');
+const execFileAsync = promisify(execFile);
+const CONVERT_TEMP_DIR = path.join(os.tmpdir(), 'prenxy-convert-cache');
+
+// Stats tracking
+const stats = {
+  totalViews: 0,
+  totalDownloads: 0,
+  startTime: Date.now(),
+  fileViews: {}
+};
+
+// Ensure documents folder exists
+if (!fs.existsSync(DOCUMENTS_DIR)) {
+  fs.mkdirSync(DOCUMENTS_DIR, { recursive: true });
+}
+if (!fs.existsSync(CONVERT_TEMP_DIR)) {
+  fs.mkdirSync(CONVERT_TEMP_DIR, { recursive: true });
+}
+
+// Configure multer for uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, DOCUMENTS_DIR),
+  filename: (req, file, cb) => {
+    const name = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    const target = path.join(DOCUMENTS_DIR, name);
+    if (fs.existsSync(target)) {
+      const ext = path.extname(name);
+      const base = path.basename(name, ext);
+      cb(null, `${base}_${Date.now()}${ext}`);
+    } else {
+      cb(null, name);
+    }
+  }
+});
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowed = ['application/pdf', 'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/plain', 'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+      'image/svg+xml', 'image/bmp', 'image/tiff', 'image/x-icon', 'image/avif',
+      'image/heic', 'image/heif'];
+    const allowedExts = ['.pdf','.doc','.docx','.ppt','.pptx','.txt',
+      '.png','.jpg','.jpeg','.gif','.webp','.svg','.bmp','.tiff','.tif',
+      '.ico','.avif','.heic','.heif'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(file.mimetype) || allowedExts.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('File type not supported'), false);
+    }
+  },
+  limits: { fileSize: 500 * 1024 * 1024 }
+});
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+function isUnsafeName(name) {
+  return !name || name.includes('..') || name.includes('/') || name.includes('\\');
+}
+
+async function convertOfficeFileToPdf(inputPath, sourceName, outputPdfName) {
+  const ext = path.extname(sourceName).toLowerCase();
+  const baseName = path.basename(sourceName, ext).replace(/[^\w.-]/g, '_');
+  const uniquePrefix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const tmpInputName = `${uniquePrefix}${ext}`;
+  const tmpOutputName = `${uniquePrefix}.pdf`;
+  const tmpInputPath = path.join(CONVERT_TEMP_DIR, tmpInputName);
+  const tmpOutputPath = path.join(CONVERT_TEMP_DIR, tmpOutputName);
+  const finalPdfName = outputPdfName || `${baseName}_export_${Date.now()}.pdf`;
+  const finalPdfPath = path.join(DOCUMENTS_DIR, finalPdfName);
+
+  await fsp.copyFile(inputPath, tmpInputPath);
+  try {
+    await execFileAsync('soffice', [
+      '--headless',
+      '--convert-to',
+      'pdf',
+      '--outdir',
+      CONVERT_TEMP_DIR,
+      tmpInputPath
+    ], { timeout: 120000, windowsHide: true });
+
+    if (!fs.existsSync(tmpOutputPath)) {
+      throw new Error('Conversion failed: output PDF was not generated');
+    }
+
+    await fsp.rename(tmpOutputPath, finalPdfPath);
+    return finalPdfName;
+  } finally {
+    if (fs.existsSync(tmpInputPath)) {
+      fs.unlinkSync(tmpInputPath);
+    }
+    if (fs.existsSync(tmpOutputPath)) {
+      fs.unlinkSync(tmpOutputPath);
+    }
+  }
+}
+
+async function convertDocxToPdf(inputPath, sourceName) {
+  const ext = path.extname(sourceName).toLowerCase();
+  if (!['.docx', '.doc'].includes(ext)) {
+    throw new Error('Only DOC and DOCX files can be converted to PDF');
+  }
+  return convertOfficeFileToPdf(inputPath, sourceName);
+}
+
+async function convertPresentationToPdf(inputPath, sourceName) {
+  const ext = path.extname(sourceName).toLowerCase();
+  if (!['.pptx', '.ppt'].includes(ext)) {
+    throw new Error('Only PPT and PPTX files can be converted to PDF');
+  }
+  const baseName = path.basename(sourceName, ext).replace(/[^\w.-]/g, '_');
+  const previewPdfName = `${baseName}_preview.pdf`;
+  return convertOfficeFileToPdf(inputPath, sourceName, previewPdfName);
+}
+
+// API: List all documents with extended metadata
+app.get('/api/pdfs', (req, res) => {
+  fs.readdir(DOCUMENTS_DIR, (err, files) => {
+    if (err) return res.status(500).json({ error: 'Failed to read documents folder' });
+    const supportedExts = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.txt', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.tiff', '.tif', '.ico', '.avif', '.heic', '.heif'];
+    const docs = files
+      .filter(file => supportedExts.some(ext => file.toLowerCase().endsWith(ext)))
+      .map(file => {
+        const stats_f = fs.statSync(path.join(DOCUMENTS_DIR, file));
+        const ext = path.extname(file).toLowerCase();
+        return {
+          name: file,
+          size: stats_f.size,
+          modified: stats_f.mtime,
+          created: stats_f.birthtime,
+          type: ext.replace('.', ''),
+          views: stats.fileViews[file] || 0
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+    res.json(docs);
+  });
+});
+
+// API: Search documents
+app.get('/api/search', (req, res) => {
+  const query = (req.query.q || '').toLowerCase();
+  if (!query) return res.json([]);
+  fs.readdir(DOCUMENTS_DIR, (err, files) => {
+    if (err) return res.status(500).json({ error: 'Search failed' });
+    const results = files
+      .filter(file => file.toLowerCase().includes(query))
+      .map(file => {
+        const s = fs.statSync(path.join(DOCUMENTS_DIR, file));
+        return { name: file, size: s.size, modified: s.mtime, type: path.extname(file).replace('.', '') };
+      });
+    res.json(results);
+  });
+});
+
+// API: Get server stats
+app.get('/api/stats', (req, res) => {
+  const supportedExts = ['.pdf','.doc','.docx','.ppt','.pptx','.txt','.png','.jpg','.jpeg','.gif','.webp','.svg','.bmp','.tiff','.tif','.ico','.avif','.heic','.heif'];
+  const allFiles = fs.readdirSync(DOCUMENTS_DIR).filter(f => supportedExts.some(e => f.toLowerCase().endsWith(e)));
+  const totalFiles = allFiles.length;
+  const totalSize = allFiles.reduce((sum, f) => sum + fs.statSync(path.join(DOCUMENTS_DIR, f)).size, 0);
+  const pdfCount = allFiles.filter(f => f.toLowerCase().endsWith('.pdf')).length;
+  const imgCount = allFiles.filter(f => ['.png','.jpg','.jpeg','.gif','.webp','.svg','.bmp','.tiff','.tif','.ico','.avif','.heic','.heif'].some(e => f.toLowerCase().endsWith(e))).length;
+  const docCount = allFiles.filter(f => ['.doc','.docx','.txt'].some(e => f.toLowerCase().endsWith(e))).length;
+  const pptCount = allFiles.filter(f => ['.ppt','.pptx'].some(e => f.toLowerCase().endsWith(e))).length;
+  res.json({
+    totalFiles,
+    totalSize,
+    pdfCount, imgCount, docCount, pptCount,
+    totalViews: stats.totalViews,
+    totalDownloads: stats.totalDownloads,
+    uptime: Date.now() - stats.startTime
+  });
+});
+
+// API: Convert DOC/DOCX to PDF (local conversion, no external service)
+app.post('/api/convert/docx-to-pdf/:filename', async (req, res) => {
+  const filename = req.params.filename;
+  if (isUnsafeName(filename)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+
+  const inputPath = path.join(DOCUMENTS_DIR, filename);
+  if (!fs.existsSync(inputPath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  try {
+    const pdfName = await convertDocxToPdf(inputPath, filename);
+    return res.json({
+      success: true,
+      pdfName,
+      viewUrl: `/documents/${encodeURIComponent(pdfName)}`,
+      downloadUrl: `/api/download/${encodeURIComponent(pdfName)}`
+    });
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return res.status(500).json({
+        error: 'LibreOffice (soffice) is not installed on the server'
+      });
+    }
+    return res.status(500).json({ error: error.message || 'Conversion failed' });
+  }
+});
+
+// API: Convert PPT/PPTX to PDF for in-app viewing
+app.post('/api/convert/presentation-to-pdf/:filename', async (req, res) => {
+  const filename = req.params.filename;
+  if (isUnsafeName(filename)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+
+  const inputPath = path.join(DOCUMENTS_DIR, filename);
+  if (!fs.existsSync(inputPath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  try {
+    const pdfName = await convertPresentationToPdf(inputPath, filename);
+    return res.json({
+      success: true,
+      pdfName,
+      viewUrl: `/documents/${encodeURIComponent(pdfName)}`
+    });
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return res.status(500).json({
+        error: 'LibreOffice (soffice) is not installed on the server'
+      });
+    }
+    return res.status(500).json({ error: error.message || 'Presentation conversion failed' });
+  }
+});
+
+// API: OCR / text extraction for PDF
+app.post('/api/ocr/pdf/:filename', async (req, res) => {
+  const filename = req.params.filename;
+  if (isUnsafeName(filename)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+
+  const inputPath = path.join(DOCUMENTS_DIR, filename);
+  if (!fs.existsSync(inputPath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+  if (path.extname(filename).toLowerCase() !== '.pdf') {
+    return res.status(400).json({ error: 'OCR is available only for PDF files' });
+  }
+
+  const maxPages = Math.max(1, Math.min(25, Number(req.body?.maxPages) || 10));
+  const forceOcr = Boolean(req.body?.forceOcr);
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const txtOutPath = path.join(CONVERT_TEMP_DIR, `${runId}.txt`);
+  const imagePrefix = path.join(CONVERT_TEMP_DIR, `${runId}-page`);
+
+  try {
+    let extracted = '';
+    try {
+      await execFileAsync('pdftotext', [
+        '-f', '1',
+        '-l', String(maxPages),
+        '-layout',
+        inputPath,
+        txtOutPath
+      ], { timeout: 120000, windowsHide: true });
+      if (fs.existsSync(txtOutPath)) {
+        extracted = (await fsp.readFile(txtOutPath, 'utf8')).trim();
+      }
+    } catch (err) {
+      if (err.code !== 'ENOENT') {
+        console.warn('pdftotext failed, falling back to OCR:', err.message);
+      }
+    }
+
+    if (extracted.length > 40 && !forceOcr) {
+      return res.json({
+        success: true,
+        source: 'text-layer',
+        pagesProcessed: maxPages,
+        text: extracted
+      });
+    }
+
+    await execFileAsync('pdftoppm', [
+      '-f', '1',
+      '-l', String(maxPages),
+      '-r', '220',
+      '-png',
+      inputPath,
+      imagePrefix
+    ], { timeout: 180000, windowsHide: true });
+
+    const generated = (await fsp.readdir(CONVERT_TEMP_DIR))
+      .filter(name => name.startsWith(`${runId}-page-`) && name.endsWith('.png'))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+    if (!generated.length) {
+      return res.status(500).json({ error: 'OCR failed: no page images generated' });
+    }
+
+    const pageTexts = [];
+    for (let i = 0; i < generated.length; i++) {
+      const pageImg = path.join(CONVERT_TEMP_DIR, generated[i]);
+      const { stdout } = await execFileAsync('tesseract', [
+        pageImg,
+        'stdout',
+        '-l', 'eng',
+        '--psm', '1'
+      ], { timeout: 180000, windowsHide: true, maxBuffer: 20 * 1024 * 1024 });
+      const normalized = (stdout || '').trim();
+      pageTexts.push(`\n--- Page ${i + 1} ---\n${normalized}`);
+    }
+
+    const ocrText = pageTexts.join('\n').trim();
+    return res.json({
+      success: true,
+      source: 'ocr',
+      pagesProcessed: generated.length,
+      text: ocrText
+    });
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return res.status(500).json({
+        error: 'OCR tools missing. Install poppler-utils and tesseract-ocr'
+      });
+    }
+    return res.status(500).json({ error: error.message || 'OCR failed' });
+  } finally {
+    if (fs.existsSync(txtOutPath)) {
+      fs.unlinkSync(txtOutPath);
+    }
+    try {
+      const tempFiles = await fsp.readdir(CONVERT_TEMP_DIR);
+      for (const name of tempFiles) {
+        if (name.startsWith(`${runId}-page-`) && name.endsWith('.png')) {
+          fs.unlinkSync(path.join(CONVERT_TEMP_DIR, name));
+        }
+      }
+    } catch {}
+  }
+});
+
+// API: Rename a file
+app.put('/api/rename', (req, res) => {
+  const { oldName, newName } = req.body;
+  if (!oldName || !newName) return res.status(400).json({ error: 'Both oldName and newName required' });
+  if (oldName.includes('..') || newName.includes('..')) return res.status(400).json({ error: 'Invalid filename' });
+  const oldPath = path.join(DOCUMENTS_DIR, oldName);
+  const newPath = path.join(DOCUMENTS_DIR, newName);
+  if (!fs.existsSync(oldPath)) return res.status(404).json({ error: 'File not found' });
+  if (fs.existsSync(newPath)) return res.status(409).json({ error: 'A file with that name already exists' });
+  fs.renameSync(oldPath, newPath);
+  res.json({ success: true, name: newName });
+});
+
+// API: Bulk download as ZIP
+app.post('/api/bulk-download', (req, res) => {
+  const { files } = req.body;
+  if (!files || !files.length) return res.status(400).json({ error: 'No files specified' });
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', 'attachment; filename="prenxy-documents.zip"');
+
+  const archive = archiver('zip', { zlib: { level: 5 } });
+  archive.on('error', err => res.status(500).json({ error: err.message }));
+  archive.pipe(res);
+
+  for (const file of files) {
+    if (file.includes('..') || file.includes('/') || file.includes('\\')) continue;
+    const filePath = path.join(DOCUMENTS_DIR, file);
+    if (fs.existsSync(filePath)) {
+      archive.file(filePath, { name: file });
+      stats.totalDownloads++;
+    }
+  }
+  archive.finalize();
+});
+
+// Serve documents inline (for viewing)
+app.get('/documents/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(DOCUMENTS_DIR, filename);
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\'))
+    return res.status(400).json({ error: 'Invalid filename' });
+  if (!fs.existsSync(filePath))
+    return res.status(404).json({ error: 'File not found' });
+
+  // Track view
+  stats.totalViews++;
+  stats.fileViews[filename] = (stats.fileViews[filename] || 0) + 1;
+
+  const ext = path.extname(filename).toLowerCase();
+  const mimeTypes = {
+    '.pdf': 'application/pdf',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.ppt': 'application/vnd.ms-powerpoint',
+    '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    '.txt': 'text/plain',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+    '.bmp': 'image/bmp',
+    '.tiff': 'image/tiff',
+    '.tif': 'image/tiff',
+    '.ico': 'image/x-icon',
+    '.avif': 'image/avif',
+    '.heic': 'image/heic',
+    '.heif': 'image/heif'
+  };
+
+  res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+  res.sendFile(filePath);
+});
+
+// Force download
+app.get('/api/download/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(DOCUMENTS_DIR, filename);
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\'))
+    return res.status(400).json({ error: 'Invalid filename' });
+  if (!fs.existsSync(filePath))
+    return res.status(404).json({ error: 'File not found' });
+
+  stats.totalDownloads++;
+
+  const stat = fs.statSync(filePath);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Content-Length', stat.size);
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
+});
+
+// Upload files (now supports multiple types)
+app.post('/api/upload', upload.array('files', 50), (req, res) => {
+  if (!req.files || req.files.length === 0)
+    return res.status(400).json({ error: 'No files uploaded' });
+  const uploaded = req.files.map(f => ({
+    name: f.filename,
+    size: f.size,
+    modified: new Date(),
+    type: path.extname(f.filename).replace('.', '')
+  }));
+  res.json({ success: true, files: uploaded });
+});
+
+// Delete single file
+app.delete('/api/pdfs/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(DOCUMENTS_DIR, filename);
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\'))
+    return res.status(400).json({ error: 'Invalid filename' });
+  if (!fs.existsSync(filePath))
+    return res.status(404).json({ error: 'File not found' });
+  fs.unlinkSync(filePath);
+  res.json({ success: true });
+});
+
+// Bulk delete
+app.post('/api/bulk-delete', (req, res) => {
+  const { files } = req.body;
+  if (!files || !files.length) return res.status(400).json({ error: 'No files specified' });
+  const results = [];
+  for (const file of files) {
+    if (file.includes('..') || file.includes('/') || file.includes('\\')) continue;
+    const filePath = path.join(DOCUMENTS_DIR, file);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      results.push({ name: file, deleted: true });
+    }
+  }
+  res.json({ success: true, results });
+});
+
+// Easter egg: secret API
+app.get('/api/secret', (req, res) => {
+  const secrets = [
+    "The cake is a lie. But this PDF viewer is real. 🎂",
+    "You found the secret API! You must be a developer. 🧑‍💻",
+    "42 - The answer to life, the universe, and document management.",
+    "There are 10 types of people: those who understand binary, and those who don't.",
+    "// TODO: Add more easter eggs (this has been here since 2024)",
+    "Prenxy was built with ❤️ and probably too much caffeine.",
+    "sudo make me a sandwich 🥪",
+    "Have you tried turning your PDF off and on again?",
+    "The mitochondria is the powerhouse of the cell. PDFs are the powerhouse of knowledge.",
+    "QuantumTunneling: where your documents pass through barriers effortlessly ⚛️"
+  ];
+  res.json({ message: secrets[Math.floor(Math.random() * secrets.length)], found: true });
+});
+
+// Error handling for multer
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ error: err.message });
+  }
+  if (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  next();
+});
+
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return '0.0.0.0';
+}
+
+app.listen(PORT, '0.0.0.0', () => {
+  const localIP = getLocalIP();
+  console.log('');
+  console.log('  ╔═══════════════════════════════════════════════════════╗');
+  console.log('  ║                                                       ║');
+  console.log('  ║   ⚛️  Prenxy PDF+ Document Manager & Viewer            ║');
+  console.log('  ║                                                       ║');
+  console.log(`  ║   🌐  Local:    http://localhost:${PORT}                  ║`);
+  console.log(`  ║   📡  Network:  http://${localIP}:${PORT}               ║`);
+  console.log(`  ║   📂  ${DOCUMENTS_DIR}`);
+  console.log('  ║                                                       ║');
+  console.log('  ║   All devices on your LAN can connect via Network URL ║');
+  console.log('  ║                                                       ║');
+  console.log('  ╚═══════════════════════════════════════════════════════╝');
+  console.log('');
+});

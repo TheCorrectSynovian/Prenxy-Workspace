@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="liquid-glass">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Prenxy Study Hub</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ═══ LOGIN ═══ */
+    .login-screen {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .login-card {
+      width: 400px; max-width: 95vw; background: var(--bg-secondary);
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      padding: 48px 36px 36px; text-align: center;
+      box-shadow: var(--shadow-lg); position: relative; overflow: hidden;
+    }
+    .login-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+      background: var(--accent-gradient);
+    }
+    .login-logo { font-size: 52px; margin-bottom: 8px; }
+    .login-logo i { background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .login-title { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+    .login-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
+    .field { text-align: left; margin-bottom: 16px; }
+    .field label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 6px; }
+    .login-btn {
+      width: 100%; padding: 13px; margin-top: 8px;
+      background: var(--accent-gradient); color: #fff; border: none;
+      border-radius: var(--radius-sm); font-size: 15px; font-weight: 700;
+      font-family: inherit; cursor: pointer; transition: opacity 0.2s;
+    }
+    .login-btn:hover { opacity: 0.9; }
+    .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .login-error { color: var(--danger); font-size: 13px; margin-top: 12px; min-height: 18px; }
+    .login-footer { margin-top: 24px; font-size: 11px; color: var(--text-muted); }
+
+    /* ═══ HUB ═══ */
+    .hub { flex: 1; display: none; flex-direction: column; }
+    .hub.active { display: flex; }
+    .hub-content { flex: 1; padding: 40px 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
+    .hub-greeting { font-size: 28px; font-weight: 300; margin-bottom: 4px; color: var(--text-primary); }
+    .hub-greeting strong { font-weight: 800; }
+    .hub-handle { font-size: 14px; color: var(--text-muted); margin-bottom: 40px; }
+    .hub-section { margin-bottom: 40px; }
+    .hub-section h2 { font-size: 16px; font-weight: 600; color: var(--text-secondary); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* App cards */
+    .app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+    .app-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 28px 24px;
+      cursor: pointer; transition: var(--transition); text-decoration: none;
+      display: flex; align-items: flex-start; gap: 20px;
+      position: relative; overflow: hidden;
+    }
+    .app-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--border-hover); text-decoration: none; }
+    .app-card .icon-wrap {
+      width: 56px; height: 56px; border-radius: var(--radius-md);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; color: #fff; flex-shrink: 0;
+    }
+    .app-card .info { flex: 1; }
+    .app-card .info h3 { font-size: 17px; font-weight: 700; margin-bottom: 4px; color: var(--text-primary); }
+    .app-card .info p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+    .card-drive .icon-wrap { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .card-social .icon-wrap { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .card-chat .icon-wrap { background: linear-gradient(135deg, #10b981, #059669); }
+
+    /* ═══ PROFILE SECTION ═══ */
+    .profile-section {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 24px; display: flex; gap: 20px;
+      align-items: center; flex-wrap: wrap;
+    }
+    .profile-avatar-wrap { position: relative; cursor: pointer; }
+    .profile-avatar-wrap:hover .avatar-edit { opacity: 1; }
+    .avatar-edit {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.5);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 16px; opacity: 0; transition: opacity 0.2s;
+    }
+    .profile-info { flex: 1; min-width: 200px; }
+    .profile-info .name { font-size: 20px; font-weight: 700; }
+    .profile-info .handle { font-size: 14px; color: var(--text-muted); }
+    .profile-info .role { display: inline-block; padding: 2px 10px; font-size: 11px; font-weight: 600; border-radius: 99px; margin-top: 6px; text-transform: uppercase; }
+    .role-admin { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .role-student { background: rgba(59,130,246,0.15); color: var(--info); }
+    .profile-edit { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .profile-edit .field { margin-bottom: 0; flex: 1; min-width: 150px; }
+    .profile-edit input { padding: 8px 12px; font-size: 13px; }
+
+    /* ═══ ADMIN PANEL ═══ */
+    .admin-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; }
+    .admin-panel h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .create-user-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .create-user-form input { flex: 1; min-width: 140px; padding: 10px 12px; }
+    .user-list { display: flex; flex-direction: column; gap: 8px; }
+    .user-row {
+      display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+      background: var(--bg-tertiary); border-radius: var(--radius-sm);
+    }
+    .user-row .name { font-weight: 600; font-size: 14px; flex: 1; }
+    .user-row .handle { font-size: 12px; color: var(--text-muted); }
+    .user-row .del-btn {
+      background: none; border: 1px solid var(--danger); color: var(--danger);
+      padding: 4px 10px; border-radius: var(--radius-sm); font-size: 11px;
+      cursor: pointer; font-family: inherit;
+    }
+    .user-row .del-btn:hover { background: var(--danger); color: #fff; }
+
+    /* Approvals */
+    .approval-item {
+      display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+      background: var(--bg-tertiary); border-radius: var(--radius-sm); margin-bottom: 8px;
+    }
+    .approval-item .meta { flex: 1; }
+    .approval-item .meta .type { font-weight: 600; font-size: 13px; text-transform: capitalize; }
+    .approval-item .meta .detail { font-size: 12px; color: var(--text-muted); }
+    .approval-btns { display: flex; gap: 6px; }
+    .approval-btns button { padding: 5px 12px; border: none; border-radius: var(--radius-sm); font-size: 12px; font-family: inherit; cursor: pointer; font-weight: 600; }
+    .approve-btn { background: var(--success); color: #fff; }
+    .reject-btn { background: var(--danger); color: #fff; }
+    .review-btn { background: var(--info); color: #fff; }
+    .no-items { font-size: 13px; color: var(--text-muted); padding: 12px; text-align: center; }
+
+    /* ═══ THEME PICKER (on hub) ═══ */
+    .theme-bar { display: flex; gap: 6px; flex-wrap: wrap; }
+    .theme-dot {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 2px solid var(--border); cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .theme-dot:hover { transform: scale(1.2); }
+    .theme-dot.active { border-color: var(--accent-primary); transform: scale(1.15); box-shadow: 0 0 8px var(--accent-glow); }
+  </style>
+</head>
+<body>
+  <!-- login screen -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-card">
+      <div class="login-logo"><i class="fas fa-atom"></i></div>
+      <div class="login-title">Prenxy Study Hub</div>
+      <div class="login-sub">Sign in to access your workspace</div>
+      <form id="loginForm" autocomplete="off">
+        <div class="field">
+          <label for="loginUser">Username</label>
+          <input type="text" id="loginUser" placeholder="Enter your username" required autofocus>
+        </div>
+        <div class="field">
+          <label for="loginPass">Password</label>
+          <input type="password" id="loginPass" placeholder="Enter your password" required>
+        </div>
+        <button type="submit" class="login-btn" id="loginBtn"><i class="fas fa-sign-in-alt"></i> Sign In</button>
+        <div class="login-error" id="loginError"></div>
+      </form>
+      <div class="login-footer"><i class="fas fa-lock"></i> Secured with AES-256 encryption</div>
+    </div>
+  </div>
+
+  <!-- hub (shown after login) -->
+  <div class="hub" id="hub">
+    <!-- top bar -->
+    <div class="top-bar">
+      <div class="left">
+        <a class="logo-link" href="/"><i class="fas fa-atom"></i> Prenxy</a>
+      </div>
+      <div class="right">
+        <div class="theme-bar" id="themeBar"></div>
+        <div class="user-chip" id="userChip">
+          <div class="avatar sm" id="topAvatar"></div>
+          <span id="topName">user</span>
+        </div>
+        <button class="btn-icon" id="btnLogout" title="Sign Out"><i class="fas fa-sign-out-alt"></i></button>
+      </div>
+    </div>
+
+    <div class="hub-content">
+      <!-- greeting -->
+      <div class="hub-greeting" id="hubGreeting">Welcome, <strong>User</strong></div>
+      <div class="hub-handle" id="hubHandle">@user</div>
+
+      <!-- apps -->
+      <div class="hub-section">
+        <h2><i class="fas fa-th-large"></i> Your Apps</h2>
+        <div class="app-grid">
+          <a class="app-card card-drive" href="/drive.html">
+            <div class="icon-wrap"><i class="fas fa-folder-open"></i></div>
+            <div class="info">
+              <h3>Prenxy Drive</h3>
+              <p>Upload, view & manage your documents, PDFs, and images.</p>
+            </div>
+          </a>
+          <a class="app-card card-social" href="/social.html">
+            <div class="icon-wrap"><i class="fas fa-users"></i></div>
+            <div class="info">
+              <h3>Prenxy Social</h3>
+              <p>Post updates, comment, and react with your peers.</p>
+            </div>
+          </a>
+          <a class="app-card card-chat" href="/chat.html">
+            <div class="icon-wrap"><i class="fas fa-comments"></i></div>
+            <div class="info">
+              <h3>Prenxy Chat</h3>
+              <p>Direct messaging with classmates and instructors.</p>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <!-- profile -->
+      <div class="hub-section">
+        <h2><i class="fas fa-user-cog"></i> Your Profile</h2>
+        <div class="profile-section">
+          <div class="profile-avatar-wrap" id="avatarWrap">
+            <div class="avatar xl" id="profileAvatar"></div>
+            <div class="avatar-edit"><i class="fas fa-camera"></i></div>
+            <input type="file" id="avatarInput" accept="image/*" hidden>
+          </div>
+          <div class="profile-info">
+            <div class="name" id="profileName">User</div>
+            <div class="handle" id="profileHandle">@user</div>
+            <div class="role" id="profileRole">user</div>
+          </div>
+          <div class="profile-edit">
+            <div class="field"><label>Display Name</label><input type="text" id="editName" maxlength="50"></div>
+            <div class="field"><label>Handle</label><input type="text" id="editHandle" maxlength="30" placeholder="@handle"></div>
+            <button class="btn btn-primary" id="btnSaveProfile" style="height:38px;align-self:flex-end"><i class="fas fa-save"></i> Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- admin panel (hidden for students) -->
+      <div class="hub-section" id="adminSection" style="display:none">
+        <h2><i class="fas fa-shield-alt"></i> Admin Panel</h2>
+        <div class="admin-panel">
+          <h3><i class="fas fa-user-plus"></i> Create Student Account</h3>
+          <div class="create-user-form">
+            <input type="text" id="newUser" placeholder="Username">
+            <input type="password" id="newPass" placeholder="Password">
+            <input type="text" id="newDisplayName" placeholder="Display name (optional)">
+            <button class="btn btn-primary" id="btnCreateUser"><i class="fas fa-plus"></i> Create</button>
+          </div>
+          <h3><i class="fas fa-users"></i> Student Accounts</h3>
+          <div class="user-list" id="userList"><div class="no-items">No students yet</div></div>
+          <h3 style="margin-top:24px"><i class="fas fa-bell"></i> Pending Approvals</h3>
+          <div id="approvalList"><div class="no-items">No pending approvals</div></div>
+          <h3 style="margin-top:24px"><i class="fas fa-flag"></i> DM Reports</h3>
+          <div id="dmReportList"><div class="no-items">No pending DM reports</div></div>
+          <h3 style="margin-top:24px"><i class="fas fa-exclamation-triangle"></i> Social Post Reports</h3>
+          <div id="socialReportList"><div class="no-items">No pending post reports</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- toast container -->
+  <div class="toast-container" id="toasts"></div>
+
+  <script>
+  (() => {
+    'use strict';
+    const themes = [
+      { id: 'liquid-glass', color: '#38bdf8' }, { id: 'classic', color: '#7c3aed' },
+      { id: 'light', color: '#a855f7' }, { id: 'asteroid', color: '#ff6b35' },
+      { id: 'techi', color: '#00ffd5' }, { id: 'vscode-dark', color: '#569cd6' },
+      { id: 'vscode-light', color: '#0066b8' }, { id: 'google', color: '#4285f4' }
+    ];
+
+    // ── auth helpers ──
+    function getToken() { return localStorage.getItem('authToken'); }
+    function setToken(t) { localStorage.setItem('authToken', t); }
+    function clearAuth() { localStorage.removeItem('authToken'); localStorage.removeItem('authUser'); }
+    function authHeaders(extra = {}) {
+      const h = { ...extra }; const t = getToken();
+      if (t) h['Authorization'] = 'Bearer ' + t;
+      return h;
+    }
+    async function authFetch(url, opts = {}) {
+      opts.headers = authHeaders(opts.headers || {});
+      const res = await fetch(url, opts);
+      if (res.status === 401) { clearAuth(); showLogin(); throw new Error('AUTH'); }
+      return res;
+    }
+
+    // ── toast ──
+    function toast(msg, type = 'info') {
+      const el = document.createElement('div');
+      el.className = 'toast ' + type;
+      el.innerHTML = `<i class="fas fa-${type==='success'?'check-circle':type==='error'?'exclamation-circle':type==='warning'?'exclamation-triangle':'info-circle'}"></i> ${msg}`;
+      document.getElementById('toasts').appendChild(el);
+      setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3500);
+    }
+
+    // ── theme ──
+    function setTheme(id) {
+      document.documentElement.setAttribute('data-theme', id);
+      localStorage.setItem('theme', id);
+      document.querySelectorAll('.theme-dot').forEach(d => d.classList.toggle('active', d.dataset.theme === id));
+    }
+    const savedTheme = localStorage.getItem('theme') || 'liquid-glass';
+    setTheme(savedTheme);
+
+    // render theme dots
+    const themeBar = document.getElementById('themeBar');
+    themes.forEach(t => {
+      const dot = document.createElement('div');
+      dot.className = 'theme-dot' + (t.id === savedTheme ? ' active' : '');
+      dot.dataset.theme = t.id;
+      dot.style.background = t.color;
+      dot.title = t.id;
+      dot.onclick = () => setTheme(t.id);
+      themeBar.appendChild(dot);
+    });
+
+    // ── screens ──
+    function showLogin() { document.getElementById('loginScreen').style.display = 'flex'; document.getElementById('hub').classList.remove('active'); }
+    function showHub() { document.getElementById('loginScreen').style.display = 'none'; document.getElementById('hub').classList.add('active'); }
+
+    // ── avatar helper ──
+    function renderAvatar(el, url, name) {
+      if (url) { el.innerHTML = `<img src="${url}" alt="">`; }
+      else { el.textContent = (name || '?')[0].toUpperCase(); }
+    }
+
+    // ── login ──
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      const err = document.getElementById('loginError');
+      const user = document.getElementById('loginUser').value.trim();
+      const pass = document.getElementById('loginPass').value;
+      if (!user || !pass) { err.textContent = 'Fill in all fields'; return; }
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+      err.textContent = '';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, password: pass })
+        });
+        const data = await res.json();
+        if (!res.ok) { err.textContent = data.error || 'Login failed'; return; }
+        setToken(data.token);
+        localStorage.setItem('authUser', data.username);
+        loadHub();
+      } catch (e) { err.textContent = 'Connection failed'; }
+      finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In'; }
+    });
+
+    // ── logout ──
+    document.getElementById('btnLogout').addEventListener('click', async () => {
+      try { await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() }); } catch {}
+      clearAuth(); showLogin();
+      document.getElementById('loginUser').value = '';
+      document.getElementById('loginPass').value = '';
+    });
+
+    // ── load hub ──
+    async function loadHub() {
+      showHub();
+      try {
+        const profile = await (await authFetch('/api/profile')).json();
+        document.getElementById('hubGreeting').innerHTML = `Welcome back, <strong>${profile.displayName}</strong>`;
+        document.getElementById('hubHandle').textContent = profile.handle;
+        document.getElementById('profileName').textContent = profile.displayName;
+        document.getElementById('profileHandle').textContent = profile.handle;
+        document.getElementById('topName').textContent = profile.displayName;
+        document.getElementById('editName').value = profile.displayName;
+        document.getElementById('editHandle').value = profile.handle;
+        const roleEl = document.getElementById('profileRole');
+        roleEl.textContent = profile.role;
+        roleEl.className = 'role role-' + profile.role;
+        renderAvatar(document.getElementById('profileAvatar'), profile.avatar, profile.displayName);
+        renderAvatar(document.getElementById('topAvatar'), profile.avatar, profile.displayName);
+        if (profile.role === 'admin') {
+          document.getElementById('adminSection').style.display = '';
+          loadStudents();
+          loadApprovals();
+          loadDMReports();
+          loadSocialReports();
+        } else {
+          document.getElementById('adminSection').style.display = 'none';
+        }
+      } catch {}
+    }
+
+    // ── profile save ──
+    document.getElementById('btnSaveProfile').addEventListener('click', async () => {
+      const displayName = document.getElementById('editName').value.trim();
+      const handle = document.getElementById('editHandle').value.trim();
+      try {
+        const res = await authFetch('/api/profile', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ displayName, handle })
+        });
+        const data = await res.json();
+        if (data.success) { toast('Profile updated!', 'success'); loadHub(); }
+        else { toast(data.error || 'Failed', 'error'); }
+      } catch { toast('Failed to save', 'error'); }
+    });
+
+    // ── avatar upload ──
+    document.getElementById('avatarWrap').addEventListener('click', () => document.getElementById('avatarInput').click());
+    document.getElementById('avatarInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('avatar', file);
+      try {
+        const res = await authFetch('/api/profile/avatar', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.success) { toast('Avatar updated!', 'success'); loadHub(); }
+        else toast(data.error || 'Failed', 'error');
+      } catch { toast('Upload failed', 'error'); }
+    });
+
+    // ── admin: create user ──
+    document.getElementById('btnCreateUser').addEventListener('click', async () => {
+      const username = document.getElementById('newUser').value.trim();
+      const password = document.getElementById('newPass').value;
+      const displayName = document.getElementById('newDisplayName').value.trim();
+      if (!username || !password) { toast('Username and password required', 'warning'); return; }
+      try {
+        const res = await authFetch('/api/admin/create-user', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, displayName })
+        });
+        const data = await res.json();
+        if (data.success) {
+          toast(`Student "${username}" created!`, 'success');
+          document.getElementById('newUser').value = '';
+          document.getElementById('newPass').value = '';
+          document.getElementById('newDisplayName').value = '';
+          loadStudents();
+        } else toast(data.error, 'error');
+      } catch { toast('Failed', 'error'); }
+    });
+
+    async function loadStudents() {
+      try {
+        const students = await (await authFetch('/api/admin/users')).json();
+        const list = document.getElementById('userList');
+        if (!students.length) { list.innerHTML = '<div class="no-items">No students yet</div>'; return; }
+        list.innerHTML = students.map(s => `
+          <div class="user-row">
+            <div class="avatar sm">${s.avatar ? `<img src="${s.avatar}" alt="">` : (s.displayName || s.username)[0].toUpperCase()}</div>
+            <div class="name">${s.displayName || s.username}</div>
+            <div class="handle">${s.handle}</div>
+            <button class="del-btn" onclick="deleteStudent('${s.username}')"><i class="fas fa-trash"></i></button>
+          </div>
+        `).join('');
+      } catch {}
+    }
+
+    window.deleteStudent = async (username) => {
+      if (!confirm(`Delete student "${username}"? This cannot be undone.`)) return;
+      try {
+        const res = await authFetch(`/api/admin/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) { toast('Student deleted', 'success'); loadStudents(); }
+        else toast(data.error, 'error');
+      } catch { toast('Failed', 'error'); }
+    };
+
+    async function loadApprovals() {
+      try {
+        const items = await (await authFetch('/api/admin/approvals')).json();
+        const el = document.getElementById('approvalList');
+        if (!items.length) { el.innerHTML = '<div class="no-items">No pending approvals</div>'; return; }
+        el.innerHTML = items.map(a => `
+          <div class="approval-item">
+            <i class="fas fa-${a.type === 'upload' ? 'cloud-upload-alt' : 'trash'}" style="font-size:20px;color:var(--${a.type === 'upload' ? 'info' : 'danger'})"></i>
+            <div class="meta">
+              <div class="type">${a.type} Request</div>
+              <div class="detail">${a.filename} &mdash; by ${a.requestedBy} &mdash; ${new Date(a.timestamp).toLocaleString()}</div>
+            </div>
+            <div class="approval-btns">
+              <button class="approve-btn" onclick="handleApproval('${a.id}','approve')"><i class="fas fa-check"></i></button>
+              <button class="reject-btn" onclick="handleApproval('${a.id}','reject')"><i class="fas fa-times"></i></button>
+            </div>
+          </div>
+        `).join('');
+      } catch {}
+    }
+
+    window.handleApproval = async (id, action) => {
+      try {
+        const res = await authFetch(`/api/admin/approvals/${id}/${action}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) { toast(`Request ${data.status}`, data.status === 'approved' ? 'success' : 'warning'); loadApprovals(); }
+        else toast(data.error, 'error');
+      } catch { toast('Failed', 'error'); }
+    };
+
+    async function loadDMReports() {
+      try {
+        const items = await (await authFetch('/api/admin/dm-reports')).json();
+        const el = document.getElementById('dmReportList');
+        if (!items.length) { el.innerHTML = '<div class="no-items">No pending DM reports</div>'; return; }
+        el.innerHTML = items.map(r => `
+          <div class="approval-item">
+            <i class="fas fa-flag" style="font-size:20px;color:var(--danger)"></i>
+            <div class="meta">
+              <div class="type">DM Report: ${r.reason}</div>
+              <div class="detail">
+                Reporter: ${r.reporter?.displayName || r.reportedBy} &mdash; Sender: ${r.sender?.displayName || r.messageFrom} &mdash; ${new Date(r.timestamp).toLocaleString()}
+              </div>
+              <div class="detail" style="margin-top:4px">
+                Message: ${(r.messageText || '').replace(/</g,'&lt;').replace(/>/g,'&gt;') || '[attachment only]'}
+              </div>
+            </div>
+            <div class="approval-btns">
+              <button class="review-btn" onclick="handleDMReport('${r.id}','resolve')" title="Mark reviewed"><i class="fas fa-check-double"></i></button>
+              <button class="approve-btn" onclick="handleDMReport('${r.id}','delete-message')" title="Delete message"><i class="fas fa-trash"></i></button>
+              <button class="reject-btn" onclick="handleDMReport('${r.id}','dismiss')" title="Dismiss"><i class="fas fa-times"></i></button>
+            </div>
+          </div>
+        `).join('');
+      } catch {}
+    }
+
+    window.handleDMReport = async (id, action) => {
+      try {
+        const res = await authFetch(`/api/admin/dm-reports/${id}/${action}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) { toast(`DM report ${data.status}`, action === 'delete-message' ? 'warning' : 'success'); loadDMReports(); }
+        else toast(data.error, 'error');
+      } catch { toast('Failed', 'error'); }
+    };
+
+    async function loadSocialReports() {
+      try {
+        const items = await (await authFetch('/api/admin/reports')).json();
+        const el = document.getElementById('socialReportList');
+        if (!items.length) { el.innerHTML = '<div class="no-items">No pending post reports</div>'; return; }
+        el.innerHTML = items.map(r => `
+          <div class="approval-item">
+            <i class="fas fa-flag" style="font-size:20px;color:var(--warning)"></i>
+            <div class="meta">
+              <div class="type">Reported by ${r.reporter?.displayName || r.reportedBy}</div>
+              <div class="detail">Post by ${r.postAuthor} &mdash; ${new Date(r.timestamp).toLocaleString()}</div>
+              <div class="detail" style="margin-top:4px">Reason: ${(r.reason || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+              <div class="detail" style="margin-top:2px;opacity:.7">"${(r.postContent || '').substring(0, 120).replace(/</g,'&lt;').replace(/>/g,'&gt;')}${(r.postContent||'').length>120?'...':''}"</div>
+            </div>
+            <div class="approval-btns">
+              <button class="reject-btn" onclick="handleSocialReport('${r.id}','delete-post')" title="Delete post"><i class="fas fa-trash"></i></button>
+              <button class="approve-btn" onclick="handleSocialReport('${r.id}','dismiss')" title="Dismiss"><i class="fas fa-times"></i></button>
+            </div>
+          </div>
+        `).join('');
+      } catch {}
+    }
+
+    window.handleSocialReport = async (id, action) => {
+      try {
+        const res = await authFetch(`/api/admin/reports/${id}/${action}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) { toast(action === 'delete-post' ? 'Post deleted' : 'Report dismissed', action === 'delete-post' ? 'warning' : 'success'); loadSocialReports(); }
+        else toast(data.error, 'error');
+      } catch { toast('Failed', 'error'); }
+    };
+
+    // ── init ──
+    (async () => {
+      const token = getToken();
+      if (!token) { showLogin(); return; }
+      try {
+        const res = await fetch('/api/auth/verify', { headers: { 'Authorization': 'Bearer ' + token } });
+        if (!res.ok) { showLogin(); return; }
+        const data = await res.json();
+        if (!data.valid) { showLogin(); return; }
+        loadHub();
+      } catch { showLogin(); }
+    })();
+  })();
+  </script>
+</body>
+</html>

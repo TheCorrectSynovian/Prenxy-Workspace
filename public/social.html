@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="liquid-glass">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Prenxy Social</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    *{box-sizing:border-box}
+    body{display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden}
+
+    .social-layout{flex:1;display:flex;max-width:1000px;width:100%;margin:0 auto;padding:0 12px;gap:20px}
+    .main-col{flex:1;min-width:0;padding-bottom:40px}
+    .side-col{width:300px;flex-shrink:0;padding-top:16px;position:sticky;top:60px;height:fit-content;max-height:calc(100vh - 80px);overflow-y:auto}
+    @media(max-width:800px){.side-col{display:none}.social-layout{padding:0 8px}}
+
+    /* ═══ TABS ═══ */
+    .tab-bar{display:flex;gap:2px;margin:16px 0 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:4px;overflow-x:auto}
+    .tab{flex:1;padding:10px 8px;text-align:center;font-size:13px;font-weight:600;border-radius:var(--radius-md);cursor:pointer;color:var(--text-muted);transition:all .2s;white-space:nowrap;border:none;background:none;font-family:inherit}
+    .tab:hover{color:var(--text-primary);background:var(--bg-tertiary)}
+    .tab.active{background:var(--accent-gradient);color:#fff}
+    .tab i{margin-right:5px}
+
+    /* ═══ COMPOSE ═══ */
+    .compose{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px}
+    .compose-row{display:flex;gap:12px}
+    .compose textarea{flex:1;resize:none;padding:12px;min-height:80px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font:14px/1.5 inherit;outline:none}
+    .compose textarea:focus{border-color:var(--accent-primary)}
+    .compose textarea::placeholder{color:var(--text-muted)}
+    .compose-media-preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .compose-media-preview .thumb{position:relative;width:80px;height:80px;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--border)}
+    .compose-media-preview .thumb img{width:100%;height:100%;object-fit:cover}
+    .compose-media-preview .thumb .rm{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;border:none;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center}
+    .compose-bottom{display:flex;align-items:center;gap:8px;margin-top:12px}
+    .compose-bottom .actions{display:flex;gap:4px;flex:1}
+    .compose-bottom .actions button{background:none;border:none;color:var(--text-muted);font-size:18px;padding:6px 8px;border-radius:var(--radius-sm);cursor:pointer;transition:color .2s}
+    .compose-bottom .actions button:hover{color:var(--accent-primary);background:var(--bg-tertiary)}
+    .char-ct{font-size:11px;color:var(--text-muted);margin-right:8px}
+    .char-ct.warn{color:var(--warning)}.char-ct.over{color:var(--danger)}
+    .vis-select{padding:4px 8px;font-size:11px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-family:inherit;cursor:pointer;margin-right:4px}
+    .post-btn{padding:8px 22px;background:var(--accent-gradient);color:#fff;border:none;border-radius:99px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;transition:opacity .2s}
+    .post-btn:hover{opacity:.9}.post-btn:disabled{opacity:.4;cursor:not-allowed}
+
+    /* ═══ POST CARD ═══ */
+    .post{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px;transition:border-color .2s}
+    .post:hover{border-color:var(--border-hover)}
+    .post-head{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px}
+    .post-author{flex:1;cursor:pointer}
+    .post-author .name{font-weight:700;font-size:14px}
+    .post-author .handle{font-size:12px;color:var(--text-muted);margin-left:4px}
+    .post-author .role-tag{font-size:9px;padding:1px 6px;border-radius:99px;margin-left:4px;font-weight:600;vertical-align:middle}
+    .role-tag.admin{background:rgba(239,68,68,.15);color:var(--danger)}
+    .role-tag.student{background:rgba(59,130,246,.15);color:var(--info)}
+    .post-time{font-size:11px;color:var(--text-muted);white-space:nowrap}
+    .post-vis{font-size:10px;color:var(--text-muted);margin-left:6px}
+    .post-vis i{margin-right:2px}
+    .post-body{font-size:15px;line-height:1.6;word-break:break-word;white-space:pre-wrap;margin-bottom:10px}
+    .post-media{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;border-radius:var(--radius-md);overflow:hidden}
+    .post-media img{max-width:100%;max-height:400px;border-radius:var(--radius-md);cursor:pointer;object-fit:cover;border:1px solid var(--border)}
+    .post-media.single img{max-width:100%}
+    .post-media.multi img{width:calc(50% - 3px);max-height:220px}
+
+    /* reactions bar */
+    .reactions-bar{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+    .reaction-pill{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;border:1px solid var(--border);background:var(--bg-tertiary);cursor:pointer;transition:all .2s;font-family:inherit;color:var(--text-secondary)}
+    .reaction-pill:hover{border-color:var(--accent-primary)}
+    .reaction-pill.mine{border-color:var(--accent-primary);background:rgba(99,102,241,.12)}
+    .reaction-pill .emoji{font-size:14px}
+    .add-reaction{padding:4px 8px;font-size:14px;border-radius:99px;border:1px dashed var(--border);background:none;color:var(--text-muted);cursor:pointer;transition:all .2s;position:relative}
+    .add-reaction:hover{border-color:var(--accent-primary);color:var(--accent-primary)}
+    .reaction-picker{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:6px;display:none;flex-direction:row;gap:2px;z-index:100;box-shadow:var(--shadow-lg)}
+    .reaction-picker.show{display:flex}
+    .reaction-picker button{font-size:20px;padding:4px 6px;background:none;border:none;cursor:pointer;border-radius:var(--radius-sm);transition:transform .15s}
+    .reaction-picker button:hover{transform:scale(1.3);background:var(--bg-tertiary)}
+
+    /* post actions */
+    .post-actions{display:flex;gap:4px;padding-top:8px;border-top:1px solid var(--border)}
+    .p-action{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 4px;background:none;border:none;font-size:13px;color:var(--text-muted);font-family:inherit;cursor:pointer;border-radius:var(--radius-sm);transition:all .15s}
+    .p-action:hover{background:var(--bg-tertiary);color:var(--text-primary)}
+    .p-action.bookmarked{color:var(--warning)}
+    .p-action.del:hover{color:var(--danger)}
+
+    /* comments */
+    .comments-section{margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
+    .comment{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.08)}
+    .comment:last-of-type{border-bottom:none}
+    .comment .c-body{flex:1;font-size:13px}
+    .comment .c-meta{margin-bottom:2px}
+    .comment .c-name{font-weight:600}
+    .comment .c-handle{color:var(--text-muted);margin-left:4px;font-size:11px}
+    .comment .c-time{color:var(--text-muted);font-size:10px;margin-left:6px}
+    .comment .c-text{line-height:1.5}
+    .c-del{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;padding:2px;opacity:0;transition:opacity .2s}
+    .comment:hover .c-del{opacity:1}
+    .c-del:hover{color:var(--danger)}
+    .comment-form{display:flex;gap:8px;margin-top:8px}
+    .comment-form input{flex:1;padding:8px 14px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:99px;color:var(--text-primary);font:13px inherit;outline:none}
+    .comment-form input:focus{border-color:var(--accent-primary)}
+    .comment-form button{width:32px;height:32px;border-radius:50%;background:var(--accent-gradient);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px}
+
+    /* ═══ SIDEBAR ═══ */
+    .side-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px}
+    .side-card h3{font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+    .search-input{width:100%;padding:10px 12px 10px 36px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font:13px inherit;outline:none}
+    .search-input:focus{border-color:var(--accent-primary)}
+    .search-wrap{position:relative;margin-bottom:12px}
+    .search-wrap i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px}
+    .search-results{max-height:300px;overflow-y:auto}
+    .user-row{display:flex;align-items:center;gap:10px;padding:8px;border-radius:var(--radius-sm);cursor:pointer;transition:background .15s}
+    .user-row:hover{background:var(--bg-tertiary)}
+    .user-row .info{flex:1;min-width:0}
+    .user-row .info .name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .user-row .info .handle{font-size:11px;color:var(--text-muted)}
+    .user-row .follow-btn,.user-row .friend-btn{padding:4px 12px;border-radius:99px;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s;border:1px solid var(--border)}
+    .follow-btn{background:var(--accent-gradient);color:#fff;border:none}
+    .follow-btn.following{background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)}
+    .friend-btn{background:var(--bg-tertiary);color:var(--text-secondary)}
+    .friend-btn.pending{color:var(--warning);border-color:var(--warning)}
+    .friend-btn.friends{color:var(--success);border-color:var(--success)}
+
+    /* friend requests */
+    .fr-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.08)}
+    .fr-item:last-child{border-bottom:none}
+    .fr-item .info{flex:1}
+    .fr-item .info .name{font-weight:600;font-size:13px}
+    .fr-item .info .handle{font-size:11px;color:var(--text-muted)}
+    .fr-btns{display:flex;gap:4px}
+    .fr-btns button{width:28px;height:28px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}
+    .fr-accept{background:var(--success);color:#fff}
+    .fr-reject{background:var(--danger);color:#fff}
+
+    /* ═══ REPORT MODAL ═══ */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px}
+    .modal-overlay.show{display:flex}
+    .modal-box{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;width:400px;max-width:100%}
+    .modal-box h3{font-size:16px;font-weight:700;margin-bottom:16px}
+    .modal-box textarea{width:100%;min-height:80px;resize:none;padding:10px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font:13px/1.5 inherit;outline:none;margin-bottom:12px}
+    .modal-actions{display:flex;gap:8px;justify-content:flex-end}
+    .modal-actions button{padding:8px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid var(--border)}
+    .modal-actions .cancel{background:var(--bg-tertiary);color:var(--text-secondary)}
+    .modal-actions .submit{background:var(--danger);color:#fff;border:none}
+
+    /* ═══ USER PROFILE MODAL ═══ */
+    .profile-modal{text-align:center;padding:24px}
+    .profile-modal .avatar{margin:0 auto 12px}
+    .profile-modal .name{font-size:20px;font-weight:800}
+    .profile-modal .handle{font-size:14px;color:var(--text-muted);margin-bottom:12px}
+    .profile-stats{display:flex;gap:20px;justify-content:center;margin-bottom:16px}
+    .profile-stats .stat{text-align:center}
+    .profile-stats .stat .num{font-size:18px;font-weight:800}
+    .profile-stats .stat .label{font-size:11px;color:var(--text-muted);text-transform:uppercase}
+    .profile-actions{display:flex;gap:8px;justify-content:center}
+    .profile-actions button{padding:8px 20px;border-radius:99px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s}
+
+    /* image lightbox */
+    .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:none;align-items:center;justify-content:center;cursor:zoom-out;padding:20px}
+    .lightbox.show{display:flex}
+    .lightbox img{max-width:95vw;max-height:95vh;border-radius:8px;object-fit:contain}
+
+    /* empty & loading */
+    .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted)}
+    .empty-state i{font-size:48px;margin-bottom:16px;display:block;opacity:.3}
+    .loading-state{text-align:center;padding:40px;color:var(--text-muted)}
+  </style>
+</head>
+<body>
+  <!-- top bar -->
+  <div class="top-bar">
+    <div class="left">
+      <a class="logo-link" href="/"><i class="fas fa-arrow-left"></i> Hub</a>
+      <span style="font-weight:700;font-size:16px;margin-left:8px"><i class="fas fa-users" style="margin-right:6px;opacity:.6"></i>Prenxy Social</span>
+    </div>
+    <div class="right">
+      <div class="user-chip" id="userChip">
+        <div class="avatar sm" id="topAvatar"></div>
+        <span id="topName">user</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="social-layout">
+    <!-- main column -->
+    <div class="main-col">
+      <!-- tabs -->
+      <div class="tab-bar">
+        <button class="tab active" data-tab="feed"><i class="fas fa-home"></i>Feed</button>
+        <button class="tab" data-tab="explore"><i class="fas fa-compass"></i>Explore</button>
+        <button class="tab" data-tab="bookmarks"><i class="fas fa-bookmark"></i>Saved</button>
+        <button class="tab" data-tab="friends"><i class="fas fa-user-friends"></i>Friends</button>
+      </div>
+
+      <!-- compose -->
+      <div class="compose" id="composeBox">
+        <div class="compose-row">
+          <div class="avatar md" id="composeAvatar"></div>
+          <textarea id="composeInput" placeholder="What's on your mind?" maxlength="2000"></textarea>
+        </div>
+        <div class="compose-media-preview" id="mediaPreview"></div>
+        <div class="compose-bottom">
+          <div class="actions">
+            <button title="Add image" id="btnAddImage"><i class="fas fa-image"></i></button>
+            <button title="Add GIF" id="btnAddGif"><i class="fas fa-film"></i></button>
+          </div>
+          <span class="char-ct" id="charCt">0 / 2000</span>
+          <select class="vis-select" id="visSelect"><option value="friends">🔒 Friends</option><option value="public">🌐 Public</option></select>
+          <button class="post-btn" id="btnPost" disabled><i class="fas fa-paper-plane"></i> Post</button>
+        </div>
+        <input type="file" id="mediaInput" accept="image/*,image/gif" multiple hidden>
+      </div>
+
+      <!-- feed -->
+      <div id="feedContainer"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading...</div></div>
+
+      <!-- friends list tab content -->
+      <div id="friendsTab" style="display:none"></div>
+    </div>
+
+    <!-- sidebar -->
+    <div class="side-col">
+      <!-- search -->
+      <div class="side-card">
+        <h3><i class="fas fa-search"></i> Find People</h3>
+        <div class="search-wrap">
+          <i class="fas fa-search"></i>
+          <input class="search-input" id="userSearch" placeholder="Search users...">
+        </div>
+        <div class="search-results" id="searchResults"></div>
+      </div>
+
+      <!-- friend requests -->
+      <div class="side-card" id="frCard" style="display:none">
+        <h3><i class="fas fa-user-plus"></i> Friend Requests <span id="frBadge" style="background:var(--danger);color:#fff;font-size:10px;padding:2px 7px;border-radius:99px;margin-left:auto"></span></h3>
+        <div id="frList"></div>
+      </div>
+
+      <!-- suggested -->
+      <div class="side-card">
+        <h3><i class="fas fa-user-friends"></i> Suggestions</h3>
+        <div id="suggestions"><div style="font-size:12px;color:var(--text-muted)">Search to discover people</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- report modal -->
+  <div class="modal-overlay" id="reportModal">
+    <div class="modal-box">
+      <h3><i class="fas fa-flag" style="color:var(--danger);margin-right:6px"></i> Report Post</h3>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Tell the admin why this post is inappropriate:</p>
+      <textarea id="reportReason" placeholder="Describe the issue..." maxlength="500"></textarea>
+      <div class="modal-actions">
+        <button class="cancel" onclick="closeReportModal()">Cancel</button>
+        <button class="submit" id="btnSubmitReport"><i class="fas fa-flag"></i> Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- user profile modal -->
+  <div class="modal-overlay" id="profileModal">
+    <div class="modal-box profile-modal" id="profileContent"></div>
+  </div>
+
+  <!-- image lightbox -->
+  <div class="lightbox" id="lightbox" onclick="this.classList.remove('show')">
+    <img id="lightboxImg">
+  </div>
+
+  <!-- GIF URL prompt modal -->
+  <div class="modal-overlay" id="gifModal">
+    <div class="modal-box">
+      <h3><i class="fas fa-film" style="margin-right:6px"></i> Add GIF URL</h3>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Paste a direct link to a GIF image:</p>
+      <input type="url" id="gifUrlInput" placeholder="https://media.giphy.com/..." style="width:100%;padding:10px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font:13px inherit;outline:none;margin-bottom:12px">
+      <div class="modal-actions">
+        <button class="cancel" onclick="document.getElementById('gifModal').classList.remove('show')">Cancel</button>
+        <button class="submit" style="background:var(--accent-primary)" id="btnConfirmGif"><i class="fas fa-plus"></i> Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toasts"></div>
+
+  <script>
+  (() => {
+    'use strict';
+    const MAX_POST = 2000, MAX_COMMENT = 500;
+    const REACTIONS = [
+      {type:'like',emoji:'👍'},{type:'love',emoji:'❤️'},{type:'haha',emoji:'😂'},
+      {type:'wow',emoji:'😮'},{type:'sad',emoji:'😢'},{type:'angry',emoji:'😡'}
+    ];
+
+    // ── auth ──
+    function getToken(){return localStorage.getItem('authToken')}
+    function authHeaders(extra={}){const h={...extra};const t=getToken();if(t)h['Authorization']='Bearer '+t;return h}
+    async function authFetch(url,opts={}){opts.headers=authHeaders(opts.headers||{});const r=await fetch(url,opts);if(r.status===401){window.location.href='/';throw new Error('AUTH')}return r}
+    function toast(msg,type='info'){const el=document.createElement('div');el.className='toast '+type;el.innerHTML=`<i class="fas fa-${type==='success'?'check-circle':type==='error'?'exclamation-circle':type==='warning'?'exclamation-triangle':'info-circle'}"></i> ${msg}`;document.getElementById('toasts').appendChild(el);setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),300)},3500)}
+    function renderAvatar(el,url,name){if(url)el.innerHTML=`<img src="${url}" alt="">`;else el.textContent=(name||'?')[0].toUpperCase()}
+    function timeAgo(d){const s=Math.floor((Date.now()-new Date(d))/1000);if(s<60)return 'just now';const m=Math.floor(s/60);if(m<60)return m+'m';const h=Math.floor(m/60);if(h<24)return h+'h';const dy=Math.floor(h/24);if(dy<30)return dy+'d';return new Date(d).toLocaleDateString()}
+    function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+    const saved=localStorage.getItem('theme')||'liquid-glass';
+    document.documentElement.setAttribute('data-theme',saved);
+    if(!getToken())window.location.href='/';
+
+    let me=null, currentTab='feed', mediaFiles=[], gifUrl='', reportPostId=null;
+
+    // ── load profile ──
+    async function loadProfile(){
+      try{
+        const d=await(await authFetch('/api/profile')).json();
+        me=d;
+        document.getElementById('topName').textContent=d.displayName;
+        renderAvatar(document.getElementById('topAvatar'),d.avatar,d.displayName);
+        renderAvatar(document.getElementById('composeAvatar'),d.avatar,d.displayName);
+        // Admin gets public visibility default
+        if(d.role==='admin'){
+          document.getElementById('visSelect').value='public';
+        }
+      }catch{}
+    }
+
+    // ═══ TABS ═══
+    document.querySelectorAll('.tab').forEach(t=>{
+      t.addEventListener('click',()=>{
+        document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+        t.classList.add('active');
+        currentTab=t.dataset.tab;
+        if(currentTab==='friends'){
+          document.getElementById('feedContainer').style.display='none';
+          document.getElementById('composeBox').style.display='none';
+          document.getElementById('friendsTab').style.display='';
+          loadFriendsTab();
+        }else{
+          document.getElementById('feedContainer').style.display='';
+          document.getElementById('composeBox').style.display='';
+          document.getElementById('friendsTab').style.display='none';
+          loadFeed();
+        }
+      });
+    });
+
+    // ═══ COMPOSE ═══
+    const composeInput=document.getElementById('composeInput');
+    const charCt=document.getElementById('charCt');
+    const btnPost=document.getElementById('btnPost');
+
+    composeInput.addEventListener('input',()=>{
+      const len=composeInput.value.length;
+      charCt.textContent=`${len} / ${MAX_POST}`;
+      charCt.className='char-ct'+(len>1800?' over':len>1500?' warn':'');
+      updatePostBtn();
+    });
+
+    function updatePostBtn(){
+      const hasContent=composeInput.value.trim().length>0;
+      const hasMedia=mediaFiles.length>0||gifUrl;
+      btnPost.disabled=!(hasContent||hasMedia)||composeInput.value.length>MAX_POST;
+    }
+
+    // media upload
+    document.getElementById('btnAddImage').addEventListener('click',()=>document.getElementById('mediaInput').click());
+    document.getElementById('mediaInput').addEventListener('change',e=>{
+      const files=[...e.target.files];
+      for(const f of files){
+        if(mediaFiles.length>=4){toast('Max 4 images','warning');break}
+        mediaFiles.push(f);
+      }
+      renderMediaPreview();
+      updatePostBtn();
+      e.target.value='';
+    });
+
+    // GIF
+    document.getElementById('btnAddGif').addEventListener('click',()=>{
+      document.getElementById('gifModal').classList.add('show');
+      document.getElementById('gifUrlInput').value=gifUrl;
+      document.getElementById('gifUrlInput').focus();
+    });
+    document.getElementById('btnConfirmGif').addEventListener('click',()=>{
+      const url=document.getElementById('gifUrlInput').value.trim();
+      if(url){gifUrl=url;renderMediaPreview();updatePostBtn()}
+      document.getElementById('gifModal').classList.remove('show');
+    });
+
+    function renderMediaPreview(){
+      const el=document.getElementById('mediaPreview');
+      let html='';
+      mediaFiles.forEach((f,i)=>{
+        const url=URL.createObjectURL(f);
+        html+=`<div class="thumb"><img src="${url}"><button class="rm" onclick="removeMedia(${i})"><i class="fas fa-times"></i></button></div>`;
+      });
+      if(gifUrl){
+        html+=`<div class="thumb"><img src="${esc(gifUrl)}"><button class="rm" onclick="removeGif()"><i class="fas fa-times"></i></button></div>`;
+      }
+      el.innerHTML=html;
+    }
+    window.removeMedia=(i)=>{mediaFiles.splice(i,1);renderMediaPreview();updatePostBtn()};
+    window.removeGif=()=>{gifUrl='';renderMediaPreview();updatePostBtn()};
+
+    // post
+    btnPost.addEventListener('click',async()=>{
+      const content=composeInput.value.trim();
+      if(!content&&mediaFiles.length===0&&!gifUrl)return;
+      btnPost.disabled=true;
+      try{
+        const fd=new FormData();
+        fd.append('content',content);
+        fd.append('visibility',document.getElementById('visSelect').value);
+        if(gifUrl)fd.append('gifUrl',gifUrl);
+        mediaFiles.forEach(f=>fd.append('media',f));
+        const res=await authFetch('/api/social/posts',{method:'POST',body:fd});
+        const data=await res.json();
+        if(data.success){
+          composeInput.value='';charCt.textContent='0 / '+MAX_POST;
+          mediaFiles=[];gifUrl='';renderMediaPreview();
+          toast('Posted!','success');loadFeed();
+        }else toast(data.error,'error');
+      }catch{toast('Failed','error')}
+      updatePostBtn();
+    });
+
+    // ═══ FEED ═══
+    async function loadFeed(){
+      const container=document.getElementById('feedContainer');
+      container.innerHTML='<div class="loading-state"><i class="fas fa-spinner fa-spin"></i></div>';
+      try{
+        const tab=currentTab==='friends'?'feed':currentTab;
+        const posts=await(await authFetch(`/api/social/posts?tab=${tab}`)).json();
+        if(!posts.length){
+          const msgs={feed:'Your feed is empty. Follow people or add friends!',explore:'No posts yet. Be the first!',bookmarks:'No saved posts yet.'};
+          container.innerHTML=`<div class="empty-state"><i class="fas fa-feather-alt"></i>${msgs[tab]||'No posts'}</div>`;
+          return;
+        }
+        container.innerHTML=posts.map(p=>renderPost(p)).join('');
+      }catch{container.innerHTML='<div class="empty-state"><i class="fas fa-exclamation-triangle"></i>Failed to load</div>'}
+    }
+
+    function renderPost(p){
+      const mediaHtml=renderPostMedia(p.media||[]);
+      const reactionsHtml=renderReactions(p);
+      const commentsHtml=renderComments(p);
+      const visIcon=p.visibility==='public'?'globe-americas':'lock';
+
+      return `
+        <div class="post" id="post-${p.id}">
+          <div class="post-head">
+            <div class="avatar md" onclick="openProfile('${esc(p.username)}')" style="cursor:pointer">${p.avatar?`<img src="${esc(p.avatar)}">`:esc((p.displayName||p.username)[0].toUpperCase())}</div>
+            <div class="post-author" onclick="openProfile('${esc(p.username)}')">
+              <span class="name">${esc(p.displayName||p.username)}</span>
+              <span class="handle">${esc(p.handle||'@'+p.username)}</span>
+              ${p.role&&p.role!=='user'?`<span class="role-tag ${p.role}">${p.role}</span>`:''}
+            </div>
+            <span class="post-time">${timeAgo(p.timestamp)}</span>
+            <span class="post-vis" title="${p.visibility}"><i class="fas fa-${visIcon}"></i></span>
+          </div>
+          ${p.content?`<div class="post-body">${esc(p.content)}</div>`:''}
+          ${mediaHtml}
+          ${reactionsHtml}
+          <div class="post-actions">
+            <button class="p-action" onclick="toggleReactionPicker('${p.id}')"><i class="far fa-smile"></i> React</button>
+            <button class="p-action" onclick="toggleComments('${p.id}')"><i class="far fa-comment"></i> ${(p.comments||[]).length||''}</button>
+            <button class="p-action ${p.bookmarked?'bookmarked':''}" onclick="toggleBookmark('${p.id}')"><i class="fa${p.bookmarked?'s':'r'} fa-bookmark"></i></button>
+            ${p.canReport?`<button class="p-action" onclick="openReport('${p.id}')"><i class="far fa-flag"></i></button>`:''}
+            ${p.canDelete?`<button class="p-action del" onclick="deletePost('${p.id}')"><i class="far fa-trash-alt"></i></button>`:''}
+          </div>
+          <div id="rpicker-${p.id}" class="reaction-picker">${REACTIONS.map(r=>`<button onclick="react('${p.id}','${r.type}')" title="${r.type}">${r.emoji}</button>`).join('')}</div>
+          <div class="comments-section" id="comments-${p.id}" style="display:none">${commentsHtml}</div>
+        </div>`;
+    }
+
+    function renderPostMedia(media){
+      if(!media||!media.length)return '';
+      const cls=media.length===1?'single':'multi';
+      return `<div class="post-media ${cls}">${media.map(m=>`<img src="${esc(m.url)}" alt="${esc(m.name||'')}" onclick="openLightbox('${esc(m.url)}')" loading="lazy">`).join('')}</div>`;
+    }
+
+    function renderReactions(p){
+      if(!p.reactionCounts)return '';
+      const pills=REACTIONS.filter(r=>(p.reactionCounts[r.type]||0)>0).map(r=>{
+        const mine=p.myReactions&&p.myReactions.includes(r.type);
+        return `<button class="reaction-pill ${mine?'mine':''}" onclick="react('${p.id}','${r.type}')"><span class="emoji">${r.emoji}</span>${p.reactionCounts[r.type]}</button>`;
+      }).join('');
+      if(!pills)return '';
+      return `<div class="reactions-bar">${pills}</div>`;
+    }
+
+    function renderComments(p){
+      const comments=(p.comments||[]).map(c=>`
+        <div class="comment">
+          <div class="avatar xs">${c.avatar?`<img src="${esc(c.avatar)}">`:esc((c.displayName||c.username)[0].toUpperCase())}</div>
+          <div class="c-body">
+            <div class="c-meta"><span class="c-name">${esc(c.displayName||c.username)}</span><span class="c-handle">${esc(c.handle||'')}</span><span class="c-time">${timeAgo(c.timestamp)}</span></div>
+            <div class="c-text">${esc(c.content)}</div>
+          </div>
+          ${c.canDelete?`<button class="c-del" onclick="deleteComment('${p.id}','${c.id}')"><i class="fas fa-times"></i></button>`:''}
+        </div>`).join('');
+      return `${comments}
+        <div class="comment-form">
+          <input id="cinput-${p.id}" placeholder="Write a comment..." maxlength="${MAX_COMMENT}">
+          <button onclick="sendComment('${p.id}')"><i class="fas fa-arrow-up"></i></button>
+        </div>`;
+    }
+
+    // ═══ ACTIONS ═══
+    window.react=async(postId,type)=>{
+      document.getElementById('rpicker-'+postId).classList.remove('show');
+      try{await authFetch(`/api/social/posts/${postId}/react`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reaction:type})});loadFeed()}catch{}
+    };
+    window.toggleReactionPicker=(id)=>{
+      const el=document.getElementById('rpicker-'+id);
+      document.querySelectorAll('.reaction-picker.show').forEach(x=>{if(x!==el)x.classList.remove('show')});
+      el.classList.toggle('show');
+    };
+    window.toggleComments=(id)=>{const el=document.getElementById('comments-'+id);el.style.display=el.style.display==='none'?'':'none'};
+    window.toggleBookmark=async(id)=>{try{const r=await(await authFetch(`/api/social/posts/${id}/bookmark`,{method:'POST'})).json();if(r.success)loadFeed()}catch{}};
+    window.deletePost=async(id)=>{if(!confirm('Delete this post?'))return;try{const r=await(await authFetch(`/api/social/posts/${id}`,{method:'DELETE'})).json();if(r.success){toast('Deleted','success');loadFeed()}}catch{toast('Failed','error')}};
+    window.sendComment=async(postId)=>{
+      const inp=document.getElementById('cinput-'+postId);const content=inp.value.trim();if(!content)return;
+      try{const r=await(await authFetch(`/api/social/posts/${postId}/comments`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})})).json();if(r.success){inp.value='';loadFeed()}}catch{toast('Failed','error')}
+    };
+    window.deleteComment=async(pid,cid)=>{try{await authFetch(`/api/social/posts/${pid}/comments/${cid}`,{method:'DELETE'});loadFeed()}catch{toast('Failed','error')}};
+
+    // lightbox
+    window.openLightbox=(url)=>{document.getElementById('lightboxImg').src=url;document.getElementById('lightbox').classList.add('show')};
+
+    // ═══ REPORT ═══
+    window.openReport=(id)=>{reportPostId=id;document.getElementById('reportReason').value='';document.getElementById('reportModal').classList.add('show')};
+    window.closeReportModal=()=>document.getElementById('reportModal').classList.remove('show');
+    document.getElementById('btnSubmitReport').addEventListener('click',async()=>{
+      const reason=document.getElementById('reportReason').value.trim();
+      if(!reason){toast('Please describe the issue','warning');return}
+      try{
+        const r=await(await authFetch(`/api/social/posts/${reportPostId}/report`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason})})).json();
+        if(r.success){toast('Report submitted to admin','success');closeReportModal()}
+        else toast(r.error,'error');
+      }catch{toast('Failed','error')}
+    });
+
+    // ═══ PROFILE MODAL ═══
+    window.openProfile=async(username)=>{
+      try{
+        const u=await(await authFetch(`/api/social/users/${username}`)).json();
+        const modal=document.getElementById('profileModal');
+        const isMe=u.isMe;
+        document.getElementById('profileContent').innerHTML=`
+          <div class="avatar xl" style="margin:0 auto 12px">${u.avatar?`<img src="${esc(u.avatar)}">`:esc((u.displayName||u.username)[0].toUpperCase())}</div>
+          <div class="name">${esc(u.displayName||u.username)}</div>
+          <div class="handle">${esc(u.handle||'@'+u.username)} ${u.role!=='user'?`<span class="role-tag ${u.role}" style="font-size:10px">${u.role}</span>`:''}</div>
+          <div class="profile-stats">
+            <div class="stat"><div class="num">${u.postCount||0}</div><div class="label">Posts</div></div>
+            <div class="stat"><div class="num">${u.followersCount||0}</div><div class="label">Followers</div></div>
+            <div class="stat"><div class="num">${u.followingCount||0}</div><div class="label">Following</div></div>
+            <div class="stat"><div class="num">${u.friendsCount||0}</div><div class="label">Friends</div></div>
+          </div>
+          ${isMe?'<p style="font-size:13px;color:var(--text-muted)">This is you!</p>':`
+          <div class="profile-actions">
+            <button class="follow-btn ${u.isFollowing?'following':''}" onclick="toggleFollow('${esc(u.username)}')" style="border:${u.isFollowing?'1px solid var(--border)':'none'}">${u.isFollowing?'Following':'Follow'}</button>
+            <button class="friend-btn ${u.isFriend?'friends':u.hasPendingRequest?'pending':''}" onclick="sendFriendReq('${esc(u.username)}')" style="border:1px solid var(--border)">
+              ${u.isFriend?'<i class="fas fa-user-check"></i> Friends':u.hasPendingRequest?'<i class="fas fa-clock"></i> Pending':'<i class="fas fa-user-plus"></i> Add Friend'}
+            </button>
+          </div>`}
+          <button onclick="viewUserPosts('${esc(u.username)}')" style="margin-top:12px;padding:8px 20px;border-radius:99px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);font:13px/1 inherit;cursor:pointer;font-weight:600"><i class="fas fa-stream"></i> View Posts</button>
+        `;
+        modal.classList.add('show');
+      }catch{toast('Failed to load profile','error')}
+    };
+    document.getElementById('profileModal').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.remove('show')});
+    document.getElementById('reportModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeReportModal()});
+    document.getElementById('gifModal').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.remove('show')});
+
+    window.viewUserPosts=async(username)=>{
+      document.getElementById('profileModal').classList.remove('show');
+      const container=document.getElementById('feedContainer');
+      container.innerHTML='<div class="loading-state"><i class="fas fa-spinner fa-spin"></i></div>';
+      try{
+        const posts=await(await authFetch(`/api/social/posts?tab=user&user=${username}`)).json();
+        if(!posts.length){container.innerHTML=`<div class="empty-state"><i class="fas fa-feather-alt"></i>No visible posts from this user</div>`;return}
+        container.innerHTML=`<div style="padding:8px 0;margin-bottom:8px"><button onclick="loadFeed()" style="background:none;border:1px solid var(--border);padding:6px 14px;border-radius:99px;font:12px/1 inherit;color:var(--text-secondary);cursor:pointer"><i class="fas fa-arrow-left"></i> Back to feed</button></div>`+posts.map(p=>renderPost(p)).join('');
+      }catch{}
+    };
+
+    // ═══ FOLLOW / FRIEND ═══
+    window.toggleFollow=async(username)=>{
+      try{const r=await(await authFetch(`/api/social/follow/${username}`,{method:'POST'})).json();if(r.success){toast(r.following?'Following!':'Unfollowed','success');openProfile(username)}}catch{toast('Failed','error')}
+    };
+    window.sendFriendReq=async(username)=>{
+      try{const r=await(await authFetch('/api/social/friend-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username})})).json();
+        if(r.success){toast(r.autoAccepted?'You are now friends!':'Friend request sent!','success');openProfile(username);loadFriendRequests()}
+        else toast(r.error,'warning');
+      }catch{toast('Failed','error')}
+    };
+
+    // ═══ SEARCH ═══
+    let searchTimer=null;
+    document.getElementById('userSearch').addEventListener('input',e=>{
+      clearTimeout(searchTimer);
+      const q=e.target.value.trim();
+      if(!q){document.getElementById('searchResults').innerHTML='';return}
+      searchTimer=setTimeout(async()=>{
+        try{
+          const users=await(await authFetch(`/api/social/users/search?q=${encodeURIComponent(q)}`)).json();
+          document.getElementById('searchResults').innerHTML=users.map(u=>`
+            <div class="user-row" onclick="openProfile('${esc(u.username)}')">
+              <div class="avatar sm">${u.avatar?`<img src="${esc(u.avatar)}">`:esc((u.displayName||u.username)[0].toUpperCase())}</div>
+              <div class="info"><div class="name">${esc(u.displayName||u.username)}</div><div class="handle">${esc(u.handle||'@'+u.username)}</div></div>
+              <button class="follow-btn ${u.isFollowing?'following':''}" onclick="event.stopPropagation();toggleFollow('${esc(u.username)}')">${u.isFollowing?'✓':'Follow'}</button>
+            </div>`).join('')||'<div style="font-size:12px;color:var(--text-muted);padding:8px">No results</div>';
+        }catch{}
+      },300);
+    });
+
+    // ═══ FRIEND REQUESTS ═══
+    async function loadFriendRequests(){
+      try{
+        const d=await(await authFetch('/api/social/friend-requests')).json();
+        const card=document.getElementById('frCard');
+        if(!d.incoming.length&&!d.outgoing.length){card.style.display='none';return}
+        card.style.display='';
+        document.getElementById('frBadge').textContent=d.incoming.length||'';
+        let html='';
+        if(d.incoming.length){
+          html+=d.incoming.map(r=>`
+            <div class="fr-item">
+              <div class="avatar sm">${r.avatar?`<img src="${esc(r.avatar)}">`:esc((r.displayName||r.username)[0].toUpperCase())}</div>
+              <div class="info"><div class="name">${esc(r.displayName||r.username)}</div><div class="handle">${esc(r.handle||'')}</div></div>
+              <div class="fr-btns">
+                <button class="fr-accept" onclick="handleFR('${r.id}','accept')"><i class="fas fa-check"></i></button>
+                <button class="fr-reject" onclick="handleFR('${r.id}','reject')"><i class="fas fa-times"></i></button>
+              </div>
+            </div>`).join('');
+        }
+        if(d.outgoing.length){
+          html+='<div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-transform:uppercase;font-weight:600">Sent</div>';
+          html+=d.outgoing.map(r=>`
+            <div class="fr-item">
+              <div class="avatar sm">${r.avatar?`<img src="${esc(r.avatar)}">`:esc((r.displayName||r.username)[0].toUpperCase())}</div>
+              <div class="info"><div class="name">${esc(r.displayName||r.username)}</div><div class="handle">${esc(r.handle||'')}</div></div>
+              <span style="font-size:11px;color:var(--warning)"><i class="fas fa-clock"></i> Pending</span>
+            </div>`).join('');
+        }
+        document.getElementById('frList').innerHTML=html;
+      }catch{}
+    }
+    window.handleFR=async(id,action)=>{
+      try{const r=await(await authFetch(`/api/social/friend-requests/${id}/${action}`,{method:'POST'})).json();
+        if(r.success){toast(action==='accept'?'Friend added!':'Request declined',action==='accept'?'success':'info');loadFriendRequests();loadFeed()}
+      }catch{toast('Failed','error')}
+    };
+
+    // ═══ FRIENDS TAB ═══
+    async function loadFriendsTab(){
+      const el=document.getElementById('friendsTab');
+      el.innerHTML='<div class="loading-state"><i class="fas fa-spinner fa-spin"></i></div>';
+      try{
+        const [friends,following,followers]=await Promise.all([
+          (await authFetch('/api/social/friends')).json(),
+          (await authFetch('/api/social/following')).json(),
+          (await authFetch('/api/social/followers')).json()
+        ]);
+        let html='';
+        html+='<div class="side-card" style="margin-top:16px"><h3><i class="fas fa-user-friends"></i> Friends ('+friends.length+')</h3>';
+        if(friends.length){
+          html+=friends.map(u=>`
+            <div class="user-row" onclick="openProfile('${esc(u.username)}')">
+              <div class="avatar sm">${u.avatar?`<img src="${esc(u.avatar)}">`:esc((u.displayName||u.username)[0].toUpperCase())}</div>
+              <div class="info"><div class="name">${esc(u.displayName)}</div><div class="handle">${esc(u.handle)}</div></div>
+              <button class="friend-btn friends" onclick="event.stopPropagation();unfriend('${esc(u.username)}')" style="border:1px solid var(--border)"><i class="fas fa-user-minus"></i></button>
+            </div>`).join('');
+        }else html+='<div style="font-size:13px;color:var(--text-muted);padding:8px">No friends yet. Search to find people!</div>';
+        html+='</div>';
+
+        html+='<div class="side-card"><h3><i class="fas fa-user-plus"></i> Following ('+following.length+')</h3>';
+        if(following.length){
+          html+=following.map(u=>`
+            <div class="user-row" onclick="openProfile('${esc(u.username)}')">
+              <div class="avatar sm">${u.avatar?`<img src="${esc(u.avatar)}">`:esc((u.displayName||u.username)[0].toUpperCase())}</div>
+              <div class="info"><div class="name">${esc(u.displayName)}</div><div class="handle">${esc(u.handle)}</div></div>
+            </div>`).join('');
+        }else html+='<div style="font-size:13px;color:var(--text-muted);padding:8px">Not following anyone yet</div>';
+        html+='</div>';
+
+        html+='<div class="side-card"><h3><i class="fas fa-users"></i> Followers ('+followers.length+')</h3>';
+        if(followers.length){
+          html+=followers.map(u=>`
+            <div class="user-row" onclick="openProfile('${esc(u.username)}')">
+              <div class="avatar sm">${u.avatar?`<img src="${esc(u.avatar)}">`:esc((u.displayName||u.username)[0].toUpperCase())}</div>
+              <div class="info"><div class="name">${esc(u.displayName)}</div><div class="handle">${esc(u.handle)}</div></div>
+            </div>`).join('');
+        }else html+='<div style="font-size:13px;color:var(--text-muted);padding:8px">No followers yet</div>';
+        html+='</div>';
+
+        el.innerHTML=html;
+      }catch{el.innerHTML='<div class="empty-state"><i class="fas fa-exclamation-triangle"></i>Failed to load</div>'}
+    }
+
+    window.unfriend=async(username)=>{
+      if(!confirm(`Remove ${username} from friends?`))return;
+      try{const r=await(await authFetch(`/api/social/friends/${username}`,{method:'DELETE'})).json();
+        if(r.success){toast('Unfriended','info');loadFriendsTab()}}catch{toast('Failed','error')}
+    };
+
+    // close pickers on click outside
+    document.addEventListener('click',e=>{
+      if(!e.target.closest('.add-reaction')&&!e.target.closest('.reaction-picker')&&!e.target.closest('.p-action')){
+        document.querySelectorAll('.reaction-picker.show').forEach(x=>x.classList.remove('show'));
+      }
+    });
+
+    // ═══ INIT ═══
+    (async()=>{
+      await loadProfile();
+      loadFeed();
+      loadFriendRequests();
+      setInterval(loadFeed,30000);
+      setInterval(loadFriendRequests,30000);
+    })();
+  })();
+  </script>
+</body>
+</html>

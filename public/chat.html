@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="liquid-glass">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Prenxy Chat</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+    .chat-wrap {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 14px;
+      padding: 16px;
+      max-width: 1320px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .sidebar { display: flex; flex-direction: column; min-height: 0; }
+    .sidebar-head { padding: 14px; border-bottom: 1px solid var(--border); }
+    .sidebar-head h2 { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+    .search-box { position: relative; }
+    .search-box i {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .search-box input { padding: 10px 12px 10px 32px; font-size: 13px; }
+
+    .contact-list { overflow-y: auto; min-height: 0; }
+    .contact {
+      display: flex;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .contact:hover { background: var(--bg-hover); }
+    .contact.active { background: rgba(59,130,246,0.1); border-left: 3px solid var(--accent-primary); box-shadow: inset 0 0 0 1px rgba(59,130,246,0.08); }
+    .contact-meta { flex: 1; min-width: 0; }
+    .contact-top { display: flex; justify-content: space-between; gap: 8px; }
+    .contact-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .contact-time { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+    .contact-last { font-size: 12px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .unread {
+      margin-top: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--danger);
+      border-radius: 999px;
+    }
+
+    .chat-main { display: flex; flex-direction: column; min-height: 0; }
+    .chat-head {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .chat-title { font-size: 14px; font-weight: 700; }
+    .chat-sub { font-size: 12px; color: var(--text-muted); }
+
+    .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+    .msg-row { display: flex; gap: 8px; }
+    .msg-row.mine { justify-content: flex-end; }
+    .msg-col { max-width: min(76%, 620px); display: flex; flex-direction: column; gap: 4px; }
+    .bubble {
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+    .mine .bubble {
+      background: var(--accent-gradient);
+      color: #fff;
+      border: none;
+      border-bottom-right-radius: 6px;
+    }
+    .other .bubble { border-bottom-left-radius: 6px; }
+
+    .msg-files { display: grid; gap: 8px; }
+    .file-card {
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      border-radius: 10px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .file-card img { width: 100%; max-height: 280px; object-fit: cover; border-radius: 8px; }
+    .file-card video { width: 100%; max-height: 260px; border-radius: 8px; }
+    .file-card audio { width: 100%; }
+    .file-meta { font-size: 12px; color: var(--text-secondary); display: flex; gap: 6px; align-items: center; }
+    .file-meta a { font-weight: 600; }
+
+    .msg-foot { display: flex; align-items: center; gap: 8px; }
+    .msg-time { font-size: 11px; color: var(--text-muted); }
+    .report-btn {
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      font-size: 11px;
+      cursor: pointer;
+      padding: 0;
+    }
+    .report-btn:hover { color: var(--danger); }
+
+    .composer {
+      border-top: 1px solid var(--border);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pending-files { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pfile {
+      font-size: 11px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-tertiary);
+    }
+    .pfile button { border: none; background: none; color: var(--danger); cursor: pointer; font-size: 11px; }
+
+    .compose-row { display: flex; gap: 8px; align-items: flex-end; }
+    .compose-tools { display: flex; gap: 6px; }
+    .tool-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .tool-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .tool-btn.recording { border-color: var(--danger); color: var(--danger); animation: pulseRec 1s infinite; }
+    @keyframes pulseRec { 50% { box-shadow: 0 0 0 3px rgba(220,38,38,0.18); } }
+
+    .compose-row textarea { min-height: 44px; max-height: 130px; resize: vertical; font-size: 14px; }
+    .send-btn {
+      width: 42px;
+      height: 42px;
+      border: none;
+      border-radius: 12px;
+      background: var(--accent-gradient);
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+    .send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .empty {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 20px;
+    }
+    .empty i { font-size: 34px; opacity: 0.5; }
+
+    /* empty state hero */
+    .empty-hero { position: relative; height: 100%; width: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; overflow: hidden; }
+    .empty-hero .blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.12; animation: blobFloat 8s ease-in-out infinite; }
+    .empty-hero .blob-1 { width: 220px; height: 220px; background: var(--accent-primary); top: 10%; left: 20%; }
+    .empty-hero .blob-2 { width: 180px; height: 180px; background: #a855f7; bottom: 15%; right: 15%; animation-delay: -3s; animation-duration: 10s; }
+    .empty-hero .blob-3 { width: 140px; height: 140px; background: #38bdf8; top: 50%; left: 55%; animation-delay: -5s; animation-duration: 12s; }
+    @keyframes blobFloat { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(20px,-15px) scale(1.05); } 66% { transform: translate(-15px,20px) scale(0.95); } }
+    .empty-hero .hero-content { position: relative; z-index: 1; text-align: center; }
+    .empty-hero .wave { font-size: 56px; display: block; margin-bottom: 10px; animation: waveHand 2.5s ease-in-out infinite; transform-origin: 70% 70%; }
+    @keyframes waveHand { 0%,100% { transform: rotate(0deg); } 10%,30% { transform: rotate(14deg); } 20% { transform: rotate(-8deg); } 40% { transform: rotate(0); } }
+    .empty-hero .hero-title { font-size: 22px; font-weight: 800; margin-bottom: 6px; color: var(--text-primary); }
+    .empty-hero .hero-sub { font-size: 14px; color: var(--text-muted); line-height: 1.5; max-width: 280px; }
+    .empty-hero .watermark { position: absolute; bottom: 20px; font-size: 11px; color: var(--text-muted); opacity: 0.4; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+
+    /* typing indicator */
+    .typing-indicator { padding: 0 4px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--accent-primary); font-weight: 500; animation: fadeInTyping 0.3s ease; }
+    .typing-dots { display: inline-flex; gap: 3px; }
+    .typing-dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-primary); animation: typingBounce 1.4s ease-in-out infinite; }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingBounce { 0%,60%,100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+    @keyframes fadeInTyping { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* seen indicator */
+    .seen-check { font-size: 10px; margin-left: 2px; }
+    .seen-check.read { color: var(--accent-primary); }
+    .seen-check.sent { color: var(--text-muted); opacity: 0.5; }
+    .seen-label { font-size: 10px; color: var(--text-muted); opacity: 0.7; margin-left: 2px; }
+
+    /* contact typing sub */
+    .contact-typing { font-size: 11px; color: var(--accent-primary); font-weight: 500; margin-top: 2px; }
+    .contact-typing .typing-dots { vertical-align: middle; }
+    .contact-typing .typing-dots span { width: 3px; height: 3px; }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 900px) {
+      .chat-wrap { grid-template-columns: 1fr; }
+      .sidebar { max-height: 38vh; }
+      .msg-col { max-width: 92%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div class="left">
+      <a class="logo-link" href="/"><i class="fas fa-arrow-left"></i> Hub</a>
+      <span style="font-weight:700;font-size:16px;margin-left:8px"><i class="fas fa-comments" style="margin-right:6px;opacity:.6"></i>Prenxy Chat</span>
+    </div>
+    <div class="right">
+      <div class="user-chip">
+        <div class="avatar sm" id="topAvatar"></div>
+        <span id="topName">user</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-wrap">
+    <aside class="panel sidebar">
+      <div class="sidebar-head">
+        <h2><i class="fas fa-user-friends"></i> Conversations</h2>
+        <div class="search-box">
+          <i class="fas fa-search"></i>
+          <input id="contactSearch" type="text" placeholder="Search contacts...">
+        </div>
+      </div>
+      <div class="contact-list" id="contactList"></div>
+    </aside>
+
+    <section class="panel chat-main">
+      <div class="chat-head" id="chatHead">
+        <div class="avatar" id="chatAvatar">?</div>
+        <div>
+          <div class="chat-title" id="chatTitle">Select a conversation</div>
+          <div class="chat-sub" id="chatSub">Send text, image, GIF, audio, and document messages</div>
+        </div>
+      </div>
+
+      <div class="messages" id="messages">
+        <div class="empty-hero">
+          <div class="blob blob-1"></div>
+          <div class="blob blob-2"></div>
+          <div class="blob blob-3"></div>
+          <div class="hero-content">
+            <span class="wave">👋</span>
+            <div class="hero-title">Say hi!</div>
+            <div class="hero-sub">Pick a conversation from the left to start chatting. Send text, images, GIFs, audio &amp; more.</div>
+          </div>
+          <div class="watermark">Prenxy Chat</div>
+        </div>
+      </div>
+
+      <div class="composer" id="composer">
+        <div class="pending-files" id="pendingFiles"></div>
+        <div class="compose-row">
+          <div class="compose-tools">
+            <button class="tool-btn" id="btnAttach" title="Attach files"><i class="fas fa-paperclip"></i></button>
+            <button class="tool-btn" id="btnGif" title="Send GIF"><i class="fas fa-film"></i></button>
+            <button class="tool-btn" id="btnAudioFile" title="Attach audio"><i class="fas fa-music"></i></button>
+            <button class="tool-btn" id="btnRecord" title="Record voice note"><i class="fas fa-microphone"></i></button>
+          </div>
+          <textarea id="msgInput" placeholder="Type a message..."></textarea>
+          <button class="send-btn" id="btnSend" title="Send"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+
+      <input id="fileInput" type="file" multiple class="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.txt,.zip,.xls,.xlsx">
+      <input id="gifInput" type="file" class="hidden" accept="image/gif">
+      <input id="audioInput" type="file" class="hidden" accept="audio/*">
+    </section>
+  </div>
+
+  <div class="toast-container" id="toasts"></div>
+
+  <script>
+  (() => {
+    'use strict';
+
+    const state = {
+      profile: null,
+      contacts: [],
+      selected: null,
+      messages: [],
+      pendingFiles: [],
+      mediaRecorder: null,
+      audioChunks: [],
+      typing: false,
+      lastSeenAt: null,
+      typingTimer: null
+    };
+
+    function getToken() { return localStorage.getItem('authToken'); }
+    function authHeaders(extra = {}) { const h = { ...extra }; const t = getToken(); if (t) h.Authorization = 'Bearer ' + t; return h; }
+    async function authFetch(url, opts = {}) {
+      opts.headers = authHeaders(opts.headers || {});
+      const res = await fetch(url, opts);
+      if (res.status === 401) { window.location.href = '/'; throw new Error('AUTH'); }
+      return res;
+    }
+
+    function toast(msg, type = 'info') {
+      const el = document.createElement('div');
+      el.className = 'toast ' + type;
+      el.innerHTML = `<i class="fas fa-${type==='success'?'check-circle':type==='error'?'exclamation-circle':type==='warning'?'exclamation-triangle':'info-circle'}"></i> ${msg}`;
+      document.getElementById('toasts').appendChild(el);
+      setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 320); }, 3200);
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+    function avatarHTML(url, name, cls = 'avatar sm') {
+      if (url) return `<div class="${cls}"><img src="${url}" alt=""></div>`;
+      return `<div class="${cls}">${esc((name || '?')[0].toUpperCase())}</div>`;
+    }
+    function setAvatar(el, url, name) {
+      el.innerHTML = url ? `<img src="${url}" alt="">` : esc((name || '?')[0].toUpperCase());
+    }
+    function timeShort(ts) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      const diff = Date.now() - d.getTime();
+      if (diff < 60000) return 'now';
+      if (diff < 3600000) return Math.floor(diff / 60000) + 'm';
+      if (diff < 86400000) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleDateString();
+    }
+    function formatBytes(n) {
+      if (!n) return '0 B';
+      const u = ['B', 'KB', 'MB', 'GB'];
+      let i = 0;
+      while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+      return `${n.toFixed(n >= 10 || i === 0 ? 0 : 1)} ${u[i]}`;
+    }
+
+    async function loadProfile() {
+      const res = await authFetch('/api/profile');
+      const p = await res.json();
+      state.profile = p;
+      document.getElementById('topName').textContent = p.displayName;
+      setAvatar(document.getElementById('topAvatar'), p.avatar, p.displayName);
+    }
+
+    function getFilteredContacts() {
+      const q = document.getElementById('contactSearch').value.trim().toLowerCase();
+      if (!q) return state.contacts;
+      return state.contacts.filter(c =>
+        (c.displayName || '').toLowerCase().includes(q) ||
+        (c.handle || '').toLowerCase().includes(q) ||
+        c.username.includes(q)
+      );
+    }
+
+    function renderContacts() {
+      const list = document.getElementById('contactList');
+      const contacts = getFilteredContacts();
+      if (!contacts.length) {
+        list.innerHTML = `<div class="empty" style="height:180px"><i class="fas fa-user-slash"></i><div>No contacts available</div></div>`;
+        return;
+      }
+      list.innerHTML = contacts.map(c => `
+        <div class="contact ${state.selected === c.username ? 'active' : ''}" data-user="${c.username}">
+          ${avatarHTML(c.avatar, c.displayName)}
+          <div class="contact-meta">
+            <div class="contact-top">
+              <div class="contact-name">${esc(c.displayName || c.username)}</div>
+              <div class="contact-time">${timeShort(c.lastMessageAt)}</div>
+            </div>
+            <div class="contact-last">${esc(c.lastMessage || c.handle || '@' + c.username)}</div>
+            ${c.unreadCount ? `<span class="unread">${c.unreadCount}</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+      list.querySelectorAll('.contact').forEach(el => {
+        el.addEventListener('click', () => openConversation(el.dataset.user));
+      });
+    }
+
+    async function loadContacts() {
+      const res = await authFetch('/api/chat/contacts');
+      state.contacts = await res.json();
+      renderContacts();
+      if (!state.selected && state.contacts.length) {
+        const first = state.contacts.find(c => c.unreadCount > 0) || state.contacts[0];
+        openConversation(first.username);
+      }
+      if (state.selected && !state.contacts.some(c => c.username === state.selected)) {
+        state.selected = null;
+        renderMessages();
+      }
+    }
+
+    async function openConversation(username) {
+      if (!username) return;
+      state.selected = username;
+      renderContacts();
+      await loadMessages();
+    }
+
+    function renderAttachment(a) {
+      const safeName = esc(a.name || 'attachment');
+      const safeUrl = a.url + (a.url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(getToken());
+      if (a.kind === 'image' || a.kind === 'gif') {
+        return `<div class="file-card"><img src="${safeUrl}" alt="${safeName}"><div class="file-meta"><i class="fas fa-image"></i><a href="${safeUrl}" target="_blank" rel="noopener">${safeName}</a></div></div>`;
+      }
+      if (a.kind === 'audio') {
+        return `<div class="file-card"><audio controls src="${safeUrl}"></audio><div class="file-meta"><i class="fas fa-music"></i><a href="${safeUrl}" target="_blank" rel="noopener">${safeName}</a><span>(${formatBytes(a.size)})</span></div></div>`;
+      }
+      if (a.kind === 'video') {
+        return `<div class="file-card"><video controls src="${safeUrl}"></video><div class="file-meta"><i class="fas fa-video"></i><a href="${safeUrl}" target="_blank" rel="noopener">${safeName}</a></div></div>`;
+      }
+      return `<div class="file-card"><div class="file-meta"><i class="fas fa-file-alt"></i><a href="${safeUrl}" target="_blank" rel="noopener">${safeName}</a><span>(${formatBytes(a.size)})</span></div></div>`;
+    }
+
+    function renderMessages() {
+      const box = document.getElementById('messages');
+      const contact = state.contacts.find(c => c.username === state.selected);
+
+      if (!state.selected) {
+        box.innerHTML = `<div class="empty-hero">
+          <div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div>
+          <div class="hero-content"><span class="wave">👋</span><div class="hero-title">Say hi!</div><div class="hero-sub">Pick a conversation from the left to start chatting. Send text, images, GIFs, audio &amp; more.</div></div>
+          <div class="watermark">Prenxy Chat</div>
+        </div>`;
+        setAvatar(document.getElementById('chatAvatar'), null, '?');
+        document.getElementById('chatTitle').textContent = 'Select a conversation';
+        document.getElementById('chatSub').textContent = 'Send text, image, GIF, audio, and document messages';
+        return;
+      }
+
+      setAvatar(document.getElementById('chatAvatar'), contact?.avatar || null, contact?.displayName || state.selected);
+      document.getElementById('chatTitle').textContent = contact?.displayName || state.selected;
+
+      // Show typing or handle in subtitle
+      const subEl = document.getElementById('chatSub');
+      if (state.typing) {
+        subEl.innerHTML = `<span class="typing-indicator"><span class="typing-dots"><span></span><span></span><span></span></span> typing...</span>`;
+      } else {
+        subEl.textContent = contact?.handle || ('@' + state.selected);
+      }
+
+      if (!state.messages.length) {
+        box.innerHTML = `<div class="empty-hero">
+          <div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div>
+          <div class="hero-content"><span class="wave">👋</span><div class="hero-title">Say hi to ${esc(contact?.displayName || state.selected)}!</div><div class="hero-sub">Send the first message to start the conversation.</div></div>
+        </div>`;
+        return;
+      }
+
+      // Find the last message I sent that was seen
+      const lastSeenIdx = (() => {
+        for (let i = state.messages.length - 1; i >= 0; i--) {
+          if (state.messages[i].mine && state.messages[i].seen) return i;
+        }
+        return -1;
+      })();
+
+      box.innerHTML = state.messages.map((m, idx) => {
+        const seenHTML = m.mine ? (
+          m.seen
+            ? (idx === lastSeenIdx
+              ? `<span class="seen-check read"><i class="fas fa-check-double"></i></span><span class="seen-label">Seen${state.lastSeenAt ? ' ' + timeShort(state.lastSeenAt) : ''}</span>`
+              : `<span class="seen-check read"><i class="fas fa-check-double"></i></span>`)
+            : `<span class="seen-check sent"><i class="fas fa-check"></i></span>`
+        ) : '';
+
+        return `
+        <div class="msg-row ${m.mine ? 'mine' : 'other'}">
+          <div class="msg-col">
+            ${m.text ? `<div class="bubble">${esc(m.text)}</div>` : ''}
+            ${(m.attachments || []).length ? `<div class="msg-files">${m.attachments.map(renderAttachment).join('')}</div>` : ''}
+            <div class="msg-foot">
+              <span class="msg-time">${timeShort(m.timestamp)}</span>
+              ${seenHTML}
+              ${(!m.mine && m.canReport && !m.reported) ? `<button class="report-btn" data-report="${m.id}"><i class="fas fa-flag"></i> Report</button>` : ''}
+              ${m.reported ? `<span class="msg-time">Reported</span>` : ''}
+            </div>
+          </div>
+        </div>
+      `}).join('');
+
+      // Typing indicator at the bottom of messages
+      if (state.typing) {
+        box.innerHTML += `<div class="msg-row other"><div class="msg-col"><div class="typing-indicator" style="padding:6px 12px"><span class="typing-dots"><span></span><span></span><span></span></span> ${esc(contact?.displayName || state.selected)} is typing...</div></div></div>`;
+      }
+
+      box.querySelectorAll('[data-report]').forEach(btn => {
+        btn.addEventListener('click', () => reportMessage(btn.dataset.report));
+      });
+
+      box.scrollTop = box.scrollHeight;
+    }
+
+    async function loadMessages() {
+      if (!state.selected) return;
+      const res = await authFetch(`/api/chat/messages/${encodeURIComponent(state.selected)}`);
+      const payload = await res.json();
+      state.messages = payload.messages || [];
+      state.typing = !!payload.typing;
+      state.lastSeenAt = payload.lastSeenAt || null;
+      renderMessages();
+    }
+
+    function addPendingFiles(list) {
+      for (const f of list) {
+        if (!f) continue;
+        if (state.pendingFiles.length >= 8) {
+          toast('Max 8 attachments per message', 'warning');
+          break;
+        }
+        state.pendingFiles.push(f);
+      }
+      renderPendingFiles();
+      updateSendState();
+    }
+
+    function renderPendingFiles() {
+      const el = document.getElementById('pendingFiles');
+      if (!state.pendingFiles.length) { el.innerHTML = ''; return; }
+      el.innerHTML = state.pendingFiles.map((f, idx) =>
+        `<span class="pfile">${esc(f.name)} <small>${formatBytes(f.size)}</small> <button data-rm="${idx}"><i class="fas fa-times"></i></button></span>`
+      ).join('');
+      el.querySelectorAll('[data-rm]').forEach(b => {
+        b.addEventListener('click', () => {
+          state.pendingFiles.splice(Number(b.dataset.rm), 1);
+          renderPendingFiles();
+          updateSendState();
+        });
+      });
+    }
+
+    function updateSendState() {
+      const hasText = document.getElementById('msgInput').value.trim().length > 0;
+      const canSend = !!state.selected && (hasText || state.pendingFiles.length > 0);
+      document.getElementById('btnSend').disabled = !canSend;
+      document.getElementById('composer').style.opacity = state.selected ? '1' : '0.6';
+      document.getElementById('msgInput').disabled = !state.selected;
+    }
+
+    async function sendMessage() {
+      if (!state.selected) { toast('Choose a contact first', 'warning'); return; }
+      const text = document.getElementById('msgInput').value.trim();
+      if (!text && !state.pendingFiles.length) return;
+
+      const fd = new FormData();
+      fd.append('to', state.selected);
+      if (text) fd.append('text', text);
+      state.pendingFiles.forEach(f => fd.append('files', f));
+
+      const btn = document.getElementById('btnSend');
+      btn.disabled = true;
+      try {
+        const res = await authFetch('/api/chat/messages', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Failed to send');
+        document.getElementById('msgInput').value = '';
+        state.pendingFiles = [];
+        renderPendingFiles();
+        await loadMessages();
+        await loadContacts();
+      } catch (e) {
+        toast(e.message || 'Failed to send message', 'error');
+      } finally {
+        updateSendState();
+      }
+    }
+
+    async function reportMessage(messageId) {
+      const reason = prompt('Reason for reporting this DM (required):');
+      if (!reason || !reason.trim()) return;
+      const details = prompt('Additional details (optional):') || '';
+      try {
+        const res = await authFetch(`/api/chat/messages/${encodeURIComponent(messageId)}/report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: reason.trim(), details: details.trim() })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Failed to report');
+        toast('DM reported to admin', 'success');
+        await loadMessages();
+      } catch (e) {
+        toast(e.message || 'Failed to report', 'error');
+      }
+    }
+
+    async function toggleVoiceRecording() {
+      const btn = document.getElementById('btnRecord');
+      if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+        state.mediaRecorder.stop();
+        btn.classList.remove('recording');
+        return;
+      }
+      if (!navigator.mediaDevices || !window.MediaRecorder) {
+        toast('Voice recording is not supported on this browser', 'warning');
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        state.audioChunks = [];
+        const rec = new MediaRecorder(stream);
+        state.mediaRecorder = rec;
+        rec.ondataavailable = e => { if (e.data && e.data.size) state.audioChunks.push(e.data); };
+        rec.onstop = () => {
+          const blob = new Blob(state.audioChunks, { type: rec.mimeType || 'audio/webm' });
+          const ext = (rec.mimeType || '').includes('mp4') ? 'm4a' : 'webm';
+          const file = new File([blob], `voice-note-${Date.now()}.${ext}`, { type: rec.mimeType || 'audio/webm' });
+          addPendingFiles([file]);
+          stream.getTracks().forEach(t => t.stop());
+          toast('Voice note attached', 'success');
+        };
+        rec.start();
+        btn.classList.add('recording');
+        toast('Recording started', 'info');
+      } catch {
+        toast('Microphone access denied', 'error');
+      }
+    }
+
+    document.getElementById('contactSearch').addEventListener('input', renderContacts);
+    document.getElementById('msgInput').addEventListener('input', () => {
+      updateSendState();
+      // Send typing indicator
+      if (state.selected) {
+        clearTimeout(state.typingTimer);
+        authFetch(`/api/chat/typing/${encodeURIComponent(state.selected)}`, { method: 'POST' }).catch(() => {});
+        state.typingTimer = setTimeout(() => {}, 3000);
+      }
+    });
+    document.getElementById('btnSend').addEventListener('click', sendMessage);
+    document.getElementById('msgInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    document.getElementById('btnAttach').addEventListener('click', () => document.getElementById('fileInput').click());
+    document.getElementById('btnGif').addEventListener('click', () => document.getElementById('gifInput').click());
+    document.getElementById('btnAudioFile').addEventListener('click', () => document.getElementById('audioInput').click());
+    document.getElementById('btnRecord').addEventListener('click', toggleVoiceRecording);
+
+    document.getElementById('fileInput').addEventListener('change', e => { addPendingFiles(Array.from(e.target.files || [])); e.target.value = ''; });
+    document.getElementById('gifInput').addEventListener('change', e => { addPendingFiles(Array.from(e.target.files || [])); e.target.value = ''; });
+    document.getElementById('audioInput').addEventListener('change', e => { addPendingFiles(Array.from(e.target.files || [])); e.target.value = ''; });
+
+    (async () => {
+      const saved = localStorage.getItem('theme') || 'liquid-glass';
+      document.documentElement.setAttribute('data-theme', saved);
+      if (!getToken()) { window.location.href = '/'; return; }
+      try {
+        await loadProfile();
+        await loadContacts();
+        updateSendState();
+        setInterval(async () => {
+          try {
+            await loadContacts();
+            if (state.selected) await loadMessages();
+          } catch {}
+        }, 5000);
+      } catch {
+        window.location.href = '/';
+      }
+    })();
+  })();
+  </script>
+</body>
+</html>
