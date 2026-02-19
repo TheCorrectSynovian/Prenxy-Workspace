@@ -4,3 +4,7 @@ node_modules/
 .master.key
 .DS_Store
 Thumbs.db
+
+# User files in documents (keep README)
+documents/*
+!documents/README.md
