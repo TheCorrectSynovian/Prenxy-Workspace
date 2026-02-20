@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="liquid-glass">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Prenxy Drive</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    /* ═══ BASE ═══ */
+    html { overflow: clip; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex; flex-direction: column; height: 100dvh;
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Inter', -apple-system, system-ui, sans-serif;
+      background: var(--bg-primary); color: var(--text-primary);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    input, select, textarea { font-family: inherit; }
+    input, select { font-size: 16px !important; } /* prevent iOS zoom */
+
+    /* ═══ TOP BAR ═══ */
+    .top-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; flex-shrink: 0;
+      background: var(--bg-secondary); border-bottom: 1px solid var(--border);
+      position: relative; z-index: 10;
+    }
+    .top-bar .logo { font-size: 18px; font-weight: 800; }
+    .top-bar .logo i { margin-right: 6px; }
+    .top-bar .spacer { flex: 1; }
+    .top-bar .icon-btn {
+      width: 36px; height: 36px; border: none; border-radius: var(--radius-sm);
+      background: var(--bg-tertiary); color: var(--text-primary);
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+      cursor: pointer; transition: var(--transition);
+    }
+    .top-bar .icon-btn:active { background: var(--bg-hover); transform: scale(.92); }
+    .top-bar .badge {
+      position: absolute; top: 4px; right: 4px;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--danger);
+    }
+
+    /* ═══ SEARCH / FILTER BAR ═══ */
+    .filter-bar {
+      padding: 10px 16px 8px; flex-shrink: 0;
+      background: var(--bg-secondary);
+    }
+    .search-row { position: relative; margin-bottom: 8px; }
+    .search-row i {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      color: var(--text-muted); font-size: 13px; pointer-events: none;
+    }
+    .search-row input {
+      width: 100%; padding: 10px 14px 10px 36px;
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius-md); color: var(--text-primary);
+      outline: none; transition: var(--transition);
+    }
+    .search-row input:focus { border-color: var(--accent-primary); }
+    .chips-row {
+      display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .chips-row::-webkit-scrollbar { display: none; }
+    .chip {
+      flex-shrink: 0; padding: 6px 12px; border-radius: var(--radius-full);
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      color: var(--text-secondary); font-size: 12px; font-weight: 600;
+      cursor: pointer; white-space: nowrap; transition: var(--transition);
+    }
+    .chip:active { transform: scale(.95); }
+    .chip.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+
+    /* ═══ SORT ROW ═══ */
+    .sort-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 16px; flex-shrink: 0; gap: 8px;
+      color: var(--text-muted); font-size: 12px;
+    }
+    .sort-row select {
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text-primary);
+      padding: 4px 8px; font-size: 12px !important;
+    }
+    .file-count { font-weight: 600; }
+
+    /* ═══ FILE LIST ═══ */
+    .file-list {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    }
+    .file-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      transition: background .15s; cursor: pointer;
+      -webkit-user-select: none; user-select: none;
+    }
+    .file-item:active { background: var(--bg-hover); }
+    .file-item.selected { background: rgba(124,58,237,.08); }
+    .file-item.holding {
+      background: color-mix(in srgb, var(--accent-primary), transparent 86%);
+      transform: scale(.992);
+    }
+    .file-icon {
+      width: 42px; height: 42px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name {
+      font-size: 14px; font-weight: 600; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .file-meta {
+      font-size: 11px; color: var(--text-muted); margin-top: 2px;
+      display: flex; gap: 8px; align-items: center;
+    }
+    .file-meta .type-badge {
+      padding: 1px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase;
+      font-size: 9px;
+    }
+    .file-fav { color: #f59e0b; font-size: 10px; flex-shrink: 0; }
+    .file-actions-btn {
+      width: 36px; height: 36px; border: none; border-radius: var(--radius-sm);
+      background: transparent; color: var(--text-muted); font-size: 16px;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      flex-shrink: 0;
+    }
+    .file-actions-btn:active { background: var(--bg-hover); }
+
+    /* ═══ EMPTY STATE ═══ */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; padding: 40px 20px; text-align: center; color: var(--text-muted);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 18px; color: var(--text-secondary); margin-bottom: 8px; }
+    .empty-state p { font-size: 14px; max-width: 280px; line-height: 1.5; }
+
+    /* ═══ SELECTION BAR ═══ */
+    .selection-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      display: none; align-items: center; justify-content: space-around;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+      background: var(--bg-secondary); border-top: 1px solid var(--border);
+      z-index: 50; backdrop-filter: blur(10px);
+    }
+    .selection-bar.visible { display: flex; }
+    .selection-bar button {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      background: none; border: none; color: var(--text-secondary);
+      font-size: 10px; font-weight: 600; cursor: pointer; padding: 4px 12px;
+    }
+    .selection-bar button i { font-size: 18px; }
+    .selection-bar button.danger { color: var(--danger); }
+    .selection-bar .sel-count {
+      font-size: 13px; font-weight: 800; color: var(--accent-primary);
+    }
+
+    /* ═══ FAB ═══ */
+    .fab {
+      position: fixed; right: 16px;
+      bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--accent-gradient); color: #fff; border: none;
+      font-size: 22px; box-shadow: var(--shadow-md);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; z-index: 40; transition: var(--transition);
+    }
+    .fab:active { transform: scale(.9); }
+
+    /* ═══ BOTTOM SHEET ═══ */
+    .sheet-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      z-index: 100; display: none; align-items: flex-end; justify-content: center;
+      backdrop-filter: blur(2px);
+    }
+    .sheet-overlay.active { display: flex; }
+    .sheet {
+      background: var(--bg-secondary); border-radius: 16px 16px 0 0;
+      width: 100%; max-height: 80vh; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 0 env(safe-area-inset-bottom, 0px);
+      animation: sheetUp .3s cubic-bezier(.4,0,.2,1);
+    }
+    @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .sheet-handle {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: var(--text-muted); opacity: .4;
+      margin: 10px auto 4px;
+    }
+    .sheet-header {
+      display: flex; align-items: center; padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sheet-header h3 { flex: 1; font-size: 16px; font-weight: 700; margin: 0; }
+    .sheet-close {
+      width: 32px; height: 32px; border: none; border-radius: 50%;
+      background: var(--bg-tertiary); color: var(--text-primary);
+      font-size: 14px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .sheet-body { padding: 12px 16px; }
+    .sheet-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 0; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: var(--transition);
+    }
+    .sheet-item:last-child { border-bottom: none; }
+    .sheet-item:active { opacity: .7; }
+    .sheet-item.holding { background: var(--bg-hover); }
+    .sheet-item i { width: 24px; text-align: center; font-size: 16px; color: var(--accent-primary); }
+    .sheet-item span { font-size: 14px; font-weight: 500; }
+    .sheet-item.danger i, .sheet-item.danger span { color: var(--danger); }
+    .sheet-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+    /* ═══ UPLOAD SHEET SPECIFICS ═══ */
+    .upload-area {
+      border: 2px dashed var(--border); border-radius: var(--radius-md);
+      padding: 28px 16px; text-align: center; margin-bottom: 12px;
+      color: var(--text-muted); cursor: pointer; transition: var(--transition);
+    }
+    .upload-area:active { border-color: var(--accent-primary); background: rgba(124,58,237,.05); }
+    .upload-area i { font-size: 28px; display: block; margin-bottom: 8px; }
+    .upload-list { max-height: 200px; overflow-y: auto; margin-bottom: 12px; }
+    .upload-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--border);
+    }
+    .upload-item .u-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .upload-item .u-size { color: var(--text-muted); font-size: 11px; }
+    .upload-item .u-status { font-size: 13px; }
+    .upload-btn {
+      width: 100%; padding: 14px; border: none; border-radius: var(--radius-md);
+      background: var(--accent-gradient); color: #fff; font-size: 15px;
+      font-weight: 700; cursor: pointer; transition: var(--transition);
+    }
+    .upload-btn:active { transform: scale(.97); }
+    .upload-btn:disabled { opacity: .5; }
+    .upload-progress {
+      height: 4px; background: var(--bg-tertiary); border-radius: 2px;
+      margin-bottom: 12px; overflow: hidden; display: none;
+    }
+    .upload-progress-fill {
+      height: 100%; width: 0; background: var(--accent-gradient);
+      border-radius: 2px; transition: width .3s;
+    }
+
+    /* ═══ RENAME INPUT ═══ */
+    .rename-input {
+      width: 100%; padding: 12px; margin-bottom: 12px;
+      background: var(--bg-tertiary); border: 1px solid var(--border);
+      border-radius: var(--radius-md); color: var(--text-primary); font-size: 16px !important;
+    }
+    .rename-input:focus { outline: none; border-color: var(--accent-primary); }
+    .rename-btns { display: flex; gap: 8px; }
+    .rename-btns button {
+      flex: 1; padding: 12px; border: none; border-radius: var(--radius-md);
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .rename-btns .cancel-btn { background: var(--bg-tertiary); color: var(--text-primary); }
+    .rename-btns .save-btn { background: var(--accent-gradient); color: #fff; }
+
+    /* ═══ STATS SHEET ═══ */
+    .stat-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+    }
+    .stat-card {
+      background: var(--bg-tertiary); border-radius: var(--radius-md);
+      padding: 14px; text-align: center;
+    }
+    .stat-card .val { font-size: 22px; font-weight: 800; }
+    .stat-card .lbl { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ═══ THEME PICKER ═══ */
+    .theme-list { display: flex; flex-direction: column; gap: 2px; }
+    .theme-opt {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 0; border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .theme-opt:last-child { border-bottom: none; }
+    .theme-opt:active { opacity: .7; }
+    .theme-dot {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 2px solid var(--border); flex-shrink: 0;
+    }
+    .theme-opt.active .theme-dot { border-color: var(--accent-primary); box-shadow: 0 0 0 2px var(--accent-glow); }
+    .theme-opt span { font-size: 14px; font-weight: 500; flex: 1; }
+    .theme-opt .check { color: var(--accent-primary); font-size: 14px; display: none; }
+    .theme-opt.active .check { display: block; }
+
+    /* ═══ CLASSROOM TOGGLE ═══ */
+    .classroom-banner {
+      display: none; align-items: center; gap: 10px;
+      padding: 10px 16px; background: rgba(124,58,237,.08);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .classroom-banner.visible { display: flex; }
+    .classroom-banner i { color: var(--accent-primary); }
+    .classroom-banner span { flex: 1; font-size: 13px; font-weight: 600; }
+    .classroom-banner button {
+      padding: 6px 12px; border: 1px solid var(--accent-primary);
+      border-radius: var(--radius-sm); background: transparent;
+      color: var(--accent-primary); font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .classroom-banner button.active {
+      background: var(--accent-primary); color: #fff;
+    }
+
+    /* ═══ TOAST ═══ */
+    .toast-container {
+      position: fixed; top: 12px; left: 16px; right: 16px;
+      z-index: 200; display: flex; flex-direction: column; gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px; border-radius: var(--radius-md);
+      background: var(--bg-card); border: 1px solid var(--border);
+      box-shadow: var(--shadow-md); font-size: 13px; font-weight: 500;
+      pointer-events: all; animation: toastIn .3s;
+    }
+    .toast.exit { animation: toastOut .3s forwards; }
+    .toast-success .toast-icon { color: var(--success); }
+    .toast-error .toast-icon { color: var(--danger); }
+    .toast-info .toast-icon { color: var(--info); }
+    .toast-warning .toast-icon { color: var(--warning); }
+    @keyframes toastIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
+
+    /* ═══ SWITCH TO DESKTOP ═══ */
+    .desktop-link {
+      text-align: center; padding: 12px; font-size: 12px; color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .desktop-link a { color: var(--accent-primary); text-decoration: none; font-weight: 600; }
+
+    /* ═══ LONG-PRESS SELECTION HIGHLIGHT ═══ */
+    .file-item.selecting { background: rgba(124,58,237,.12); }
+
+    /* ═══ 2026 TOUCH REMASTER LAYER ═══ */
+    @keyframes mobileDriveAura {
+      0%,100% { transform: translate3d(0,0,0) scale(1); opacity: .26; }
+      50% { transform: translate3d(0,-10px,0) scale(1.08); opacity: .42; }
+    }
+    body::before,
+    body::after {
+      content: '';
+      position: fixed;
+      pointer-events: none;
+      z-index: -1;
+      border-radius: 50%;
+      filter: blur(54px);
+      animation: mobileDriveAura 9s ease-in-out infinite;
+    }
+    body::before {
+      width: 190px;
+      height: 190px;
+      top: 72px;
+      right: -50px;
+      background: radial-gradient(circle, rgba(56,189,248,.3), rgba(56,189,248,0) 72%);
+    }
+    body::after {
+      width: 220px;
+      height: 220px;
+      left: -80px;
+      bottom: 90px;
+      background: radial-gradient(circle, rgba(16,185,129,.2), rgba(16,185,129,0) 72%);
+      animation-delay: -3s;
+    }
+    .top-bar {
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(16px) saturate(130%);
+      -webkit-backdrop-filter: blur(16px) saturate(130%);
+      background: color-mix(in srgb, var(--bg-secondary), transparent 14%);
+      border-bottom: 1.5px solid color-mix(in srgb, var(--border), #7dd3fc 18%);
+    }
+    .filter-bar { background: color-mix(in srgb, var(--bg-secondary), transparent 12%); }
+    .file-item { min-height: 68px; border-bottom-width: 1.5px; }
+    .file-actions-btn,
+    .top-bar .icon-btn,
+    .chip,
+    .selection-bar button,
+    .sheet-item { touch-action: manipulation; }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ TOP BAR ═══ -->
+  <div class="top-bar">
+    <div class="logo"><i class="fas fa-hard-drive"></i> Drive</div>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="btnClassroom" style="display:none" onclick="toggleClassroom()">
+      <i class="fas fa-chalkboard-teacher"></i>
+    </button>
+    <button class="icon-btn" onclick="openStatsSheet()">
+      <i class="fas fa-chart-bar"></i>
+    </button>
+    <button class="icon-btn" onclick="openThemeSheet()">
+      <i class="fas fa-palette"></i>
+    </button>
+    <button class="icon-btn" onclick="doLogout()">
+      <i class="fas fa-sign-out-alt"></i>
+    </button>
+  </div>
+
+  <!-- ═══ CLASSROOM BANNER ═══ -->
+  <div class="classroom-banner" id="classroomBanner">
+    <i class="fas fa-chalkboard-teacher"></i>
+    <span id="classroomLabel">Classroom Files</span>
+    <button id="classroomToggle" onclick="toggleClassroom()">Exit</button>
+  </div>
+
+  <!-- ═══ SEARCH & FILTER ═══ -->
+  <div class="filter-bar">
+    <div class="search-row">
+      <i class="fas fa-search"></i>
+      <input type="text" id="searchInput" placeholder="Search files…" autocomplete="off" />
+    </div>
+    <div class="chips-row" id="filterChips">
+      <div class="chip active" data-filter="all" onclick="setFilter('all')">All</div>
+      <div class="chip" data-filter="pdf" onclick="setFilter('pdf')">PDF</div>
+      <div class="chip" data-filter="img" onclick="setFilter('img')">Images</div>
+      <div class="chip" data-filter="doc" onclick="setFilter('doc')">Docs</div>
+      <div class="chip" data-filter="ppt" onclick="setFilter('ppt')">Slides</div>
+      <div class="chip" data-filter="txt" onclick="setFilter('txt')">Text</div>
+    </div>
+  </div>
+
+  <!-- ═══ SORT ROW ═══ -->
+  <div class="sort-row">
+    <span class="file-count" id="fileCount">0 files</span>
+    <select id="sortSelect" onchange="setSort(this.value)">
+      <option value="name-asc">Name A→Z</option>
+      <option value="name-desc">Name Z→A</option>
+      <option value="date-desc">Newest</option>
+      <option value="date-asc">Oldest</option>
+      <option value="size-desc">Largest</option>
+      <option value="size-asc">Smallest</option>
+      <option value="type">Type</option>
+    </select>
+  </div>
+
+  <!-- ═══ FILE LIST ═══ -->
+  <div class="file-list" id="fileList"></div>
+
+  <!-- ═══ SELECTION BAR ═══ -->
+  <div class="selection-bar" id="selectionBar">
+    <span class="sel-count" id="selCount">0</span>
+    <button onclick="selectAll()"><i class="fas fa-check-double"></i>All</button>
+    <button onclick="bulkDownload()"><i class="fas fa-download"></i>Download</button>
+    <button class="danger" onclick="bulkDelete()"><i class="fas fa-trash"></i>Delete</button>
+    <button onclick="clearSelection()"><i class="fas fa-times"></i>Clear</button>
+  </div>
+
+  <!-- ═══ FAB (Upload) ═══ -->
+  <button class="fab" id="fabUpload" onclick="openUploadSheet()">
+    <i class="fas fa-plus"></i>
+  </button>
+
+  <!-- ═══ TOAST ═══ -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ═══════ SHEETS ═══════ -->
+
+  <!-- File Actions Sheet -->
+  <div class="sheet-overlay" id="actionsSheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h3 id="actionsTitle">File Actions</h3>
+        <button class="sheet-close" onclick="closeSheet('actionsSheet')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="sheet-body" id="actionsBody"></div>
+    </div>
+  </div>
+
+  <!-- Upload Sheet -->
+  <div class="sheet-overlay" id="uploadSheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h3>Upload Files</h3>
+        <button class="sheet-close" onclick="closeSheet('uploadSheet')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="sheet-body">
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+          <i class="fas fa-cloud-upload-alt"></i>
+          <div>Tap to choose files</div>
+        </div>
+        <input type="file" id="fileInput" multiple style="display:none" onchange="addFiles(this.files)" />
+        <div class="upload-list" id="uploadList"></div>
+        <div class="upload-progress" id="uploadProgress">
+          <div class="upload-progress-fill" id="uploadProgressFill"></div>
+        </div>
+        <button class="upload-btn" id="uploadBtn" disabled onclick="startUpload()">
+          <i class="fas fa-upload"></i> Upload
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Sheet -->
+  <div class="sheet-overlay" id="renameSheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h3>Rename File</h3>
+        <button class="sheet-close" onclick="closeSheet('renameSheet')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="sheet-body">
+        <input class="rename-input" id="renameInput" type="text" placeholder="New filename" />
+        <div class="rename-btns">
+          <button class="cancel-btn" onclick="closeSheet('renameSheet')">Cancel</button>
+          <button class="save-btn" onclick="doRename()">Rename</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Sheet -->
+  <div class="sheet-overlay" id="statsSheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h3>Dashboard</h3>
+        <button class="sheet-close" onclick="closeSheet('statsSheet')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="sheet-body">
+        <div class="stat-grid" id="statsGrid">
+          <div class="stat-card"><div class="val" id="statFiles">–</div><div class="lbl">Files</div></div>
+          <div class="stat-card"><div class="val" id="statSize">–</div><div class="lbl">Storage</div></div>
+          <div class="stat-card"><div class="val" id="statPdfs">–</div><div class="lbl">PDFs</div></div>
+          <div class="stat-card"><div class="val" id="statImages">–</div><div class="lbl">Images</div></div>
+          <div class="stat-card"><div class="val" id="statDocs">–</div><div class="lbl">Documents</div></div>
+          <div class="stat-card"><div class="val" id="statViews">–</div><div class="lbl">Views</div></div>
+          <div class="stat-card"><div class="val" id="statDownloads">–</div><div class="lbl">Downloads</div></div>
+          <div class="stat-card"><div class="val" id="statUptime">–</div><div class="lbl">Uptime</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Theme Sheet -->
+  <div class="sheet-overlay" id="themeSheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <h3>Theme</h3>
+        <button class="sheet-close" onclick="closeSheet('themeSheet')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="sheet-body">
+        <div class="theme-list" id="themeList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop link -->
+  <div class="desktop-link" style="display:none">
+    <a href="/drive.html?desktop=1">Switch to desktop version</a>
+  </div>
+
+  <script>
+  (function() {
+    'use strict';
+
+    /* ═══════ STATE ═══════ */
+    const state = {
+      files: [],
+      filteredFiles: [],
+      selectedFiles: new Set(),
+      sortBy: localStorage.getItem('sortBy') || 'name-asc',
+      filterType: 'all',
+      favorites: JSON.parse(localStorage.getItem('favorites') || '[]'),
+      theme: localStorage.getItem('theme') || 'liquid-glass',
+      role: null,
+      classroomShared: [],
+      classroomFiles: [],
+      showClassroom: false,
+      searchDebounce: null,
+    };
+
+    /* ═══════ AUTH ═══════ */
+    function getAuthToken() { return localStorage.getItem('authToken'); }
+    function clearAuthToken() { localStorage.removeItem('authToken'); localStorage.removeItem('authUser'); }
+    function getAuthUser() { return localStorage.getItem('authUser') || 'user'; }
+    function authHeaders(extra = {}) {
+      const t = getAuthToken();
+      const h = { ...extra };
+      if (t) h['Authorization'] = 'Bearer ' + t;
+      return h;
+    }
+    async function authFetch(url, opts = {}) {
+      opts.headers = authHeaders(opts.headers || {});
+      const res = await fetch(url, opts);
+      if (res.status === 401) { clearAuthToken(); window.location.href = '/'; throw new Error('AUTH'); }
+      return res;
+    }
+    function getDocUrl(fn) {
+      const t = getAuthToken();
+      const b = `/documents/${encodeURIComponent(fn)}`;
+      return t ? b + '?token=' + encodeURIComponent(t) : b;
+    }
+    function getDownloadUrl(fn) {
+      const t = getAuthToken();
+      const b = `/api/download/${encodeURIComponent(fn)}`;
+      return t ? b + '?token=' + encodeURIComponent(t) : b;
+    }
+    function getClassroomDocUrl(fn) {
+      const t = getAuthToken();
+      const b = '/api/classroom/documents/' + encodeURIComponent(fn);
+      return t ? b + '?token=' + encodeURIComponent(t) : b;
+    }
+    function getClassroomDownloadUrl(fn) {
+      const t = getAuthToken();
+      const b = '/api/classroom/download/' + encodeURIComponent(fn);
+      return t ? b + '?token=' + encodeURIComponent(t) : b;
+    }
+
+    /* ═══════ HELPERS ═══════ */
+    const $ = id => document.getElementById(id);
+    function esc(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+    function formatSize(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024, sizes = ['B','KB','MB','GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+    function formatDate(d) {
+      const date = new Date(d), now = new Date(), diff = now - date;
+      if (diff < 60000) return 'Just now';
+      if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+      if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+      if (diff < 604800000) return Math.floor(diff/86400000) + 'd ago';
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    function formatUptime(ms) {
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return s + 's';
+      if (s < 3600) return Math.floor(s/60) + 'm';
+      if (s < 86400) return Math.floor(s/3600) + 'h ' + (Math.floor(s/60)%60) + 'm';
+      return Math.floor(s/86400) + 'd';
+    }
+
+    function isImageType(t) { return ['png','jpg','jpeg','gif','webp','svg','bmp','tiff','tif','ico','avif','heic','heif'].includes(t); }
+    function isDocType(t) { return ['doc','docx'].includes(t); }
+
+    function getFileIcon(type) {
+      const m = { pdf:'fas fa-file-pdf', doc:'fas fa-file-word', docx:'fas fa-file-word',
+        ppt:'fas fa-file-powerpoint', pptx:'fas fa-file-powerpoint', txt:'fas fa-file-alt' };
+      if (m[type]) return m[type];
+      if (isImageType(type)) return 'fas fa-file-image';
+      return 'fas fa-file';
+    }
+    function getFileColor(type) {
+      const c = { pdf:'#ef4444', doc:'#3b82f6', docx:'#3b82f6', ppt:'#f59e0b', pptx:'#f59e0b', txt:'#10b981' };
+      if (c[type]) return c[type];
+      if (isImageType(type)) return '#a855f7';
+      return '#6b7280';
+    }
+
+    /* ═══════ TOAST ═══════ */
+    function toast(message, type='info') {
+      const icons = { success:'fa-check-circle', error:'fa-times-circle', info:'fa-info-circle', warning:'fa-exclamation-triangle' };
+      const t = document.createElement('div');
+      t.className = `toast toast-${type}`;
+      t.innerHTML = `<i class="fas ${icons[type]} toast-icon"></i><span>${message}</span>`;
+      $('toastContainer').appendChild(t);
+      setTimeout(() => { t.classList.add('exit'); setTimeout(() => t.remove(), 300); }, 3500);
+    }
+
+    /* ═══════ THEME ═══════ */
+    const THEMES = [
+      { id: 'liquid-glass', name: 'Liquid Glass', color: '#38bdf8', icon: 'fa-droplet' },
+      { id: 'classic', name: 'Classic Dark', color: '#7c3aed', icon: 'fa-moon' },
+      { id: 'light', name: 'Light', color: '#a855f7', icon: 'fa-sun' },
+      { id: 'asteroid', name: 'Asteroid', color: '#ff6b35', icon: 'fa-meteor' },
+      { id: 'techi', name: 'Techi', color: '#00ffd5', icon: 'fa-microchip' },
+      { id: 'vscode-dark', name: 'VS Code Dark', color: '#569cd6', icon: 'fa-code' },
+      { id: 'vscode-light', name: 'VS Code Light', color: '#0066b8', icon: 'fa-code' },
+      { id: 'google', name: 'Google', color: '#4285f4', icon: 'fa-google' },
+    ];
+    function setTheme(id) {
+      state.theme = id;
+      document.documentElement.setAttribute('data-theme', id);
+      localStorage.setItem('theme', id);
+      renderThemeList();
+    }
+    function renderThemeList() {
+      $('themeList').innerHTML = THEMES.map(t => `
+        <div class="theme-opt ${state.theme === t.id ? 'active' : ''}" onclick="selectTheme('${t.id}')">
+          <div class="theme-dot" style="background:${t.color}"></div>
+          <span>${t.name}</span>
+          <i class="fas fa-check check"></i>
+        </div>
+      `).join('');
+    }
+    window.selectTheme = function(id) {
+      setTheme(id);
+      closeSheet('themeSheet');
+      toast(`Theme: ${THEMES.find(t=>t.id===id)?.name}`, 'info');
+    };
+
+    /* ═══════ SHEETS ═══════ */
+    function openSheet(id) { $(id).classList.add('active'); }
+    function closeSheet(id) { $(id).classList.remove('active'); }
+    window.closeSheet = closeSheet;
+
+    // close on backdrop tap
+    document.querySelectorAll('.sheet-overlay').forEach(el => {
+      el.addEventListener('click', e => { if (e.target === el) el.classList.remove('active'); });
+    });
+
+    /* ═══════ FETCH FILES ═══════ */
+    async function fetchFiles() {
+      if (!getAuthToken()) return;
+      try {
+        const res = await authFetch('/api/pdfs');
+        state.files = await res.json();
+        applyFilters();
+        renderFiles();
+        updateFileCount();
+      } catch {
+        toast('Failed to load files', 'error');
+      }
+      fetchClassroomData();
+    }
+
+    /* ═══════ FETCH STATS ═══════ */
+    async function fetchStats() {
+      if (!getAuthToken()) return;
+      try {
+        const res = await authFetch('/api/stats');
+        const d = await res.json();
+        $('statFiles').textContent = d.totalFiles;
+        $('statSize').textContent = formatSize(d.totalSize);
+        $('statPdfs').textContent = d.pdfCount || 0;
+        $('statImages').textContent = d.imgCount || 0;
+        $('statDocs').textContent = d.docCount || 0;
+        $('statViews').textContent = d.totalViews;
+        $('statDownloads').textContent = d.totalDownloads;
+        $('statUptime').textContent = formatUptime(d.uptime);
+      } catch {}
+    }
+
+    /* ═══════ CLASSROOM ═══════ */
+    async function fetchClassroomData() {
+      if (!getAuthToken()) return;
+      try {
+        if (state.role === 'admin') {
+          const res = await authFetch('/api/admin/classroom');
+          const data = await res.json();
+          state.classroomShared = data.map(s => s.filename);
+        }
+        const res2 = await authFetch('/api/classroom/files');
+        state.classroomFiles = await res2.json();
+      } catch {}
+      const btn = $('btnClassroom');
+      if (btn) {
+        btn.style.display = (state.role === 'student' || state.classroomShared.length > 0) ? '' : 'none';
+      }
+      updateClassroomBanner();
+    }
+    function updateClassroomBanner() {
+      const banner = $('classroomBanner');
+      const toggle = $('classroomToggle');
+      if (state.showClassroom) {
+        banner.classList.add('visible');
+        toggle.classList.add('active');
+        toggle.textContent = 'Exit';
+      } else {
+        banner.classList.remove('visible');
+      }
+    }
+    window.toggleClassroom = function() {
+      state.showClassroom = !state.showClassroom;
+      updateClassroomBanner();
+      applyFilters();
+      renderFiles();
+      updateFileCount();
+    };
+
+    async function shareToClassroom(fn) {
+      try {
+        const res = await authFetch('/api/admin/classroom/share/' + encodeURIComponent(fn), { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          toast('Sent to classroom!', 'success');
+          state.classroomShared.push(fn);
+          fetchClassroomData();
+        } else { toast(data.error || 'Failed', 'error'); }
+      } catch { toast('Failed to share', 'error'); }
+    }
+
+    async function unshareFromClassroom(fn) {
+      try {
+        const res = await authFetch('/api/admin/classroom/unshare/' + encodeURIComponent(fn), { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          toast('Removed from classroom', 'info');
+          state.classroomShared = state.classroomShared.filter(f => f !== fn);
+          fetchClassroomData();
+        }
+      } catch { toast('Failed', 'error'); }
+    }
+
+    /* ═══════ SORT & FILTER ═══════ */
+    function applyFilters() {
+      let files = state.showClassroom ? [...state.classroomFiles] : [...state.files];
+
+      // Type filter
+      if (state.filterType !== 'all') {
+        if (state.filterType === 'img') files = files.filter(f => isImageType(f.type));
+        else if (state.filterType === 'doc') files = files.filter(f => isDocType(f.type));
+        else if (state.filterType === 'ppt') files = files.filter(f => ['ppt','pptx'].includes(f.type));
+        else files = files.filter(f => f.type === state.filterType);
+      }
+
+      // Search
+      const q = $('searchInput').value.toLowerCase().trim();
+      if (q) files = files.filter(f => f.name.toLowerCase().includes(q));
+
+      // Sort
+      if (!state.showClassroom) {
+        const [key, dir] = state.sortBy.split('-');
+        files.sort((a, b) => {
+          if (key === 'name') return dir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+          if (key === 'date') return dir === 'asc' ? new Date(a.modified) - new Date(b.modified) : new Date(b.modified) - new Date(a.modified);
+          if (key === 'size') return dir === 'asc' ? a.size - b.size : b.size - a.size;
+          if (key === 'type') return a.type.localeCompare(b.type);
+          return 0;
+        });
+        // Favorites first
+        const favSet = new Set(state.favorites);
+        files.sort((a, b) => (favSet.has(a.name) ? 0 : 1) - (favSet.has(b.name) ? 0 : 1));
+      }
+
+      state.filteredFiles = files;
+    }
+
+    function updateFileCount() {
+      $('fileCount').textContent = `${state.filteredFiles.length} file${state.filteredFiles.length !== 1 ? 's' : ''}`;
+    }
+
+    window.setFilter = function(type) {
+      state.filterType = type;
+      document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.filter === type));
+      applyFilters(); renderFiles(); updateFileCount();
+    };
+    window.setSort = function(val) {
+      state.sortBy = val;
+      localStorage.setItem('sortBy', val);
+      applyFilters(); renderFiles(); updateFileCount();
+    };
+
+    /* ═══════ RENDER ═══════ */
+    function renderFiles() {
+      const files = state.filteredFiles;
+      const list = $('fileList');
+
+      if (files.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📄</div>
+            <h3>No files found</h3>
+            <p>${$('searchInput').value ? 'Try a different search' : state.showClassroom ? 'No classroom files yet' : 'Upload files to get started!'}</p>
+          </div>`;
+        return;
+      }
+
+      const isFav = name => state.favorites.includes(name);
+      const isClassroom = state.showClassroom;
+
+      list.innerHTML = files.map(f => {
+        const color = getFileColor(f.type);
+        const icon = getFileIcon(f.type);
+        const fav = isFav(f.name);
+        const sel = state.selectedFiles.has(f.name);
+        const shared = !isClassroom && state.role === 'admin' && state.classroomShared.includes(f.name);
+
+        return `
+        <div class="file-item ${sel ? 'selected' : ''}" data-name="${esc(f.name)}"
+             onclick="handleFileTap(event, '${esc(f.name)}', ${isClassroom})"
+             oncontextmenu="event.preventDefault(); showFileActions('${esc(f.name)}', ${isClassroom})">
+          <div class="file-icon" style="background:${color}15;color:${color}">
+            <i class="${icon}"></i>
+          </div>
+          <div class="file-info">
+            <div class="file-name">
+              ${fav ? '<i class="fas fa-star file-fav"></i> ' : ''}${shared ? '<i class="fas fa-chalkboard-teacher" style="color:var(--accent-primary);font-size:10px"></i> ' : ''}${f.name.replace(/</g,'&lt;')}
+            </div>
+            <div class="file-meta">
+              <span class="type-badge" style="background:${color}20;color:${color}">${f.type.toUpperCase()}</span>
+              <span>${formatSize(f.size)}</span>
+              ${f.modified ? `<span>${formatDate(f.modified)}</span>` : ''}
+            </div>
+          </div>
+          <button class="file-actions-btn" onclick="event.stopPropagation(); showFileActions('${esc(f.name)}', ${isClassroom})">
+            <i class="fas fa-ellipsis-v"></i>
+          </button>
+        </div>`;
+      }).join('');
+    }
+
+    /* ═══════ FILE TAP / LONG-PRESS ═══════ */
+    let longPressTimer = null;
+    let longPressTarget = null;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    window.handleFileTap = function(event, name, isClassroom) {
+      // If in selection mode, toggle selection
+      if (state.selectedFiles.size > 0) {
+        toggleSelect(name);
+        return;
+      }
+      // Otherwise open file
+      if (isClassroom) {
+        window.open(getClassroomDocUrl(name), '_blank');
+      } else {
+        openFile(name);
+      }
+    };
+
+    // Long-press to enter selection mode
+    document.addEventListener('touchstart', e => {
+      const item = e.target.closest('.file-item');
+      if (!item) return;
+      touchStartX = e.touches?.[0]?.clientX || 0;
+      touchStartY = e.touches?.[0]?.clientY || 0;
+      const name = item.dataset.name;
+      longPressTarget = item;
+      item.classList.add('holding');
+      longPressTimer = setTimeout(() => {
+        item.classList.add('selecting');
+        navigator.vibrate?.(30);
+        toggleSelect(name);
+        item.classList.remove('holding');
+        longPressTimer = null;
+        longPressTarget = null;
+      }, 500);
+    }, { passive: true });
+    document.addEventListener('touchend', () => {
+      if (longPressTimer) clearTimeout(longPressTimer);
+      if (longPressTarget) longPressTarget.classList.remove('holding');
+      longPressTarget = null;
+    });
+    document.addEventListener('touchmove', e => {
+      const x = e.touches?.[0]?.clientX || 0;
+      const y = e.touches?.[0]?.clientY || 0;
+      const moved = Math.abs(x - touchStartX) > 10 || Math.abs(y - touchStartY) > 10;
+      if (moved && longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      if (moved && longPressTarget) longPressTarget.classList.remove('holding');
+    });
+
+    // Pull down to refresh when at top of list
+    let pullStartY = 0;
+    let pullTriggered = false;
+    const fileListEl = $('fileList');
+    fileListEl.addEventListener('touchstart', e => {
+      if (fileListEl.scrollTop <= 0) {
+        pullStartY = e.touches?.[0]?.clientY || 0;
+        pullTriggered = false;
+      }
+    }, { passive: true });
+    fileListEl.addEventListener('touchmove', e => {
+      if (fileListEl.scrollTop > 0 || pullTriggered) return;
+      const y = e.touches?.[0]?.clientY || 0;
+      if (y - pullStartY > 82) {
+        pullTriggered = true;
+        navigator.vibrate?.(18);
+        fetchFiles();
+        fetchStats();
+        toast('Refreshed', 'info');
+      }
+    }, { passive: true });
+
+    /* ═══════ OPEN FILE ═══════ */
+    function openFile(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      if (isImageType(ext) || ext === 'pdf' || ext === 'txt') {
+        window.open(getDocUrl(name), '_blank');
+      } else {
+        // docx, ppt, etc — download
+        downloadFile(name);
+      }
+    }
+
+    /* ═══════ FILE ACTIONS SHEET ═══════ */
+    window.showFileActions = function(name, isClassroom) {
+      const fav = state.favorites.includes(name);
+      const ext = name.split('.').pop().toLowerCase();
+      const isShared = state.classroomShared.includes(name);
+
+      let items = '';
+      if (isClassroom) {
+        items = `
+          <div class="sheet-item" onclick="window.open(getClassroomDocUrl('${esc(name)}'),'_blank'); closeSheet('actionsSheet')">
+            <i class="fas fa-eye"></i><span>Open</span>
+          </div>
+          <div class="sheet-item" onclick="downloadClassroomFile('${esc(name)}'); closeSheet('actionsSheet')">
+            <i class="fas fa-download"></i><span>Download</span>
+          </div>
+        `;
+      } else {
+        items = `
+          <div class="sheet-item" onclick="openFile('${esc(name)}'); closeSheet('actionsSheet')">
+            <i class="fas fa-eye"></i><span>Open</span>
+          </div>
+          <div class="sheet-item" onclick="downloadFile('${esc(name)}'); closeSheet('actionsSheet')">
+            <i class="fas fa-download"></i><span>Download</span>
+          </div>
+          <div class="sheet-item" onclick="toggleFav('${esc(name)}'); closeSheet('actionsSheet')">
+            <i class="${fav ? 'fas' : 'far'} fa-star" style="${fav ? 'color:#f59e0b' : ''}"></i>
+            <span>${fav ? 'Remove from Favorites' : 'Add to Favorites'}</span>
+          </div>
+          <div class="sheet-item" onclick="showRenameSheet('${esc(name)}'); closeSheet('actionsSheet')">
+            <i class="fas fa-pen"></i><span>Rename</span>
+          </div>
+          <div class="sheet-item" onclick="navigator.clipboard.writeText('${esc(name)}'); toast('Copied!','success'); closeSheet('actionsSheet')">
+            <i class="fas fa-copy"></i><span>Copy Name</span>
+          </div>
+          <div class="sheet-item" onclick="navigator.clipboard.writeText(location.origin+getDocUrl('${esc(name)}')); toast('Link copied!','success'); closeSheet('actionsSheet')">
+            <i class="fas fa-link"></i><span>Copy Link</span>
+          </div>`;
+
+        if (state.role === 'admin') {
+          items += `<div class="sheet-divider"></div>`;
+          if (isShared) {
+            items += `<div class="sheet-item" onclick="unshareFromClassroom('${esc(name)}'); closeSheet('actionsSheet')">
+              <i class="fas fa-chalkboard"></i><span>Remove from Classroom</span>
+            </div>`;
+          } else {
+            items += `<div class="sheet-item" onclick="shareToClassroom('${esc(name)}'); closeSheet('actionsSheet')">
+              <i class="fas fa-chalkboard-teacher"></i><span>Send to Classroom</span>
+            </div>`;
+          }
+        }
+
+        items += `
+          <div class="sheet-divider"></div>
+          <div class="sheet-item danger" onclick="deleteFile('${esc(name)}'); closeSheet('actionsSheet')">
+            <i class="fas fa-trash"></i><span>Delete</span>
+          </div>`;
+      }
+
+      $('actionsTitle').textContent = name.length > 30 ? name.substring(0, 28) + '…' : name;
+      $('actionsBody').innerHTML = items;
+      openSheet('actionsSheet');
+    };
+
+    /* ═══════ FILE OPERATIONS ═══════ */
+    function downloadFile(name) {
+      const a = document.createElement('a');
+      a.href = getDownloadUrl(name);
+      a.download = name;
+      a.click();
+      toast(`Downloading ${name}`, 'success');
+    }
+    window.downloadFile = downloadFile;
+
+    function downloadClassroomFile(name) {
+      const a = document.createElement('a');
+      a.href = getClassroomDownloadUrl(name);
+      a.download = name;
+      a.click();
+    }
+    window.downloadClassroomFile = downloadClassroomFile;
+
+    async function deleteFile(name) {
+      if (!confirm(`Delete "${name}"?`)) return;
+      try {
+        const res = await authFetch(`/api/pdfs/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.pendingApproval) toast('Delete request sent for approval', 'warning');
+        else toast(`Deleted ${name}`, 'success');
+        fetchFiles();
+      } catch { toast('Delete failed', 'error'); }
+    }
+    window.deleteFile = deleteFile;
+
+    /* ═══════ SELECTION ═══════ */
+    function toggleSelect(name) {
+      if (state.selectedFiles.has(name)) state.selectedFiles.delete(name);
+      else state.selectedFiles.add(name);
+      updateSelectionUI();
+      renderFiles();
+    }
+    window.toggleSelect = toggleSelect;
+
+    window.selectAll = function() {
+      if (state.selectedFiles.size === state.filteredFiles.length) {
+        state.selectedFiles.clear();
+      } else {
+        state.filteredFiles.forEach(f => state.selectedFiles.add(f.name));
+      }
+      updateSelectionUI();
+      renderFiles();
+    };
+
+    window.clearSelection = function() {
+      state.selectedFiles.clear();
+      updateSelectionUI();
+      renderFiles();
+    };
+
+    function updateSelectionUI() {
+      const n = state.selectedFiles.size;
+      $('selectionBar').classList.toggle('visible', n > 0);
+      $('selCount').textContent = n + ' selected';
+      $('fabUpload').style.display = n > 0 ? 'none' : '';
+    }
+
+    window.bulkDownload = async function() {
+      const files = [...state.selectedFiles];
+      if (!files.length) return;
+      toast(`Preparing ${files.length} files…`, 'info');
+      try {
+        const res = await authFetch('/api/bulk-download', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files })
+        });
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'prenxy-documents.zip'; a.click();
+        URL.revokeObjectURL(url);
+        toast('Download started!', 'success');
+        clearSelection();
+      } catch { toast('Bulk download failed', 'error'); }
+    };
+
+    window.bulkDelete = async function() {
+      const files = [...state.selectedFiles];
+      if (!files.length) return;
+      if (!confirm(`Delete ${files.length} files?`)) return;
+      try {
+        const res = await authFetch('/api/bulk-delete', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files })
+        });
+        const data = await res.json();
+        if (data.pendingApproval) toast('Delete requests sent for approval', 'warning');
+        else toast(`Deleted ${files.length} files`, 'success');
+        state.selectedFiles.clear();
+        updateSelectionUI();
+        fetchFiles();
+      } catch { toast('Bulk delete failed', 'error'); }
+    };
+
+    /* ═══════ FAVORITES ═══════ */
+    function toggleFav(name) {
+      const idx = state.favorites.indexOf(name);
+      if (idx > -1) { state.favorites.splice(idx, 1); toast('Removed from favorites', 'info'); }
+      else { state.favorites.push(name); toast('Added to favorites ⭐', 'success'); }
+      localStorage.setItem('favorites', JSON.stringify(state.favorites));
+      applyFilters(); renderFiles();
+    }
+    window.toggleFav = toggleFav;
+
+    /* ═══════ RENAME ═══════ */
+    let renameTarget = '';
+    window.showRenameSheet = function(name) {
+      renameTarget = name;
+      $('renameInput').value = name;
+      openSheet('renameSheet');
+      setTimeout(() => {
+        const input = $('renameInput');
+        input.focus();
+        const dot = name.lastIndexOf('.');
+        if (dot > 0) input.setSelectionRange(0, dot);
+      }, 200);
+    };
+    window.doRename = async function() {
+      const newName = $('renameInput').value.trim();
+      if (!newName || newName === renameTarget) { closeSheet('renameSheet'); return; }
+      try {
+        const res = await authFetch('/api/rename', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldName: renameTarget, newName })
+        });
+        const data = await res.json();
+        if (data.success) { toast(`Renamed to ${newName}`, 'success'); closeSheet('renameSheet'); fetchFiles(); }
+        else { toast(data.error || 'Rename failed', 'error'); }
+      } catch { toast('Rename failed', 'error'); }
+    };
+
+    /* ═══════ UPLOAD ═══════ */
+    let pendingUpload = [];
+    window.openUploadSheet = function() {
+      pendingUpload = [];
+      $('uploadList').innerHTML = '';
+      $('uploadBtn').disabled = true;
+      $('uploadProgress').style.display = 'none';
+      $('uploadProgressFill').style.width = '0%';
+      openSheet('uploadSheet');
+    };
+    window.addFiles = function(fileList) {
+      for (const f of fileList) pendingUpload.push(f);
+      $('uploadList').innerHTML = pendingUpload.map(f => `
+        <div class="upload-item">
+          <i class="${getFileIcon(f.name.split('.').pop().toLowerCase())}"></i>
+          <span class="u-name">${f.name}</span>
+          <span class="u-size">${formatSize(f.size)}</span>
+        </div>
+      `).join('');
+      $('uploadBtn').disabled = pendingUpload.length === 0;
+    };
+    window.startUpload = function() {
+      if (!pendingUpload.length) return;
+      const form = new FormData();
+      pendingUpload.forEach(f => form.append('files', f));
+      $('uploadProgress').style.display = 'block';
+      $('uploadBtn').disabled = true;
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload');
+      const token = getAuthToken();
+      if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) $('uploadProgressFill').style.width = Math.round((e.loaded / e.total) * 100) + '%';
+      };
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const d = JSON.parse(xhr.responseText);
+          if (d.pendingApproval) toast('Upload sent for approval', 'warning');
+          else toast(`Uploaded ${d.files.length} file(s)!`, 'success');
+          closeSheet('uploadSheet');
+          fetchFiles();
+        } else if (xhr.status === 401) {
+          clearAuthToken(); window.location.href = '/';
+        } else {
+          toast('Upload failed', 'error');
+          $('uploadBtn').disabled = false;
+        }
+      };
+      xhr.onerror = () => { toast('Upload failed', 'error'); $('uploadBtn').disabled = false; };
+      xhr.send(form);
+    };
+
+    /* ═══════ STATS SHEET ═══════ */
+    window.openStatsSheet = function() { fetchStats(); openSheet('statsSheet'); };
+
+    /* ═══════ THEME SHEET ═══════ */
+    window.openThemeSheet = function() { renderThemeList(); openSheet('themeSheet'); };
+
+    /* ═══════ LOGOUT ═══════ */
+    window.doLogout = async function() {
+      try { await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() }); } catch {}
+      clearAuthToken();
+      window.location.href = '/';
+    };
+
+    /* ═══════ SEARCH DEBOUNCE ═══════ */
+    $('searchInput').addEventListener('input', () => {
+      clearTimeout(state.searchDebounce);
+      state.searchDebounce = setTimeout(() => {
+        applyFilters(); renderFiles(); updateFileCount();
+      }, 200);
+    });
+
+    /* ═══════ SORT SELECT INIT ═══════ */
+    $('sortSelect').value = state.sortBy;
+
+    /* ═══════ INIT ═══════ */
+    setTheme(state.theme);
+
+    (async () => {
+      const token = getAuthToken();
+      if (!token) { window.location.href = '/'; return; }
+      try {
+        const res = await fetch('/api/auth/verify', { headers: { 'Authorization': 'Bearer ' + token } });
+        if (!res.ok) { window.location.href = '/'; return; }
+        const data = await res.json();
+        if (!data.valid) { window.location.href = '/'; return; }
+        localStorage.setItem('authUser', data.username);
+        state.role = data.role;
+      } catch { window.location.href = '/'; return; }
+
+      fetchFiles();
+      fetchStats();
+    })();
+
+    setInterval(() => { if (getAuthToken()) fetchStats(); }, 30000);
+
+  })();
+  </script>
+</body>
+</html>

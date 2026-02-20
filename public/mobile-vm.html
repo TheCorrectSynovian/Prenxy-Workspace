@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="liquid-glass">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Prenxy VM</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    body { min-height: 100vh; }
+    .wrap { padding: 16px; max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    .desc { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+    .resource-grid { display: grid; gap: 10px; }
+    .resource-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; }
+    .rc-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; margin-bottom: 8px; }
+    .rc-desc { font-size: 12px; color: var(--text-muted); }
+    .rc-badge { display: inline-block; margin-top: 7px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; }
+    .active { background: rgba(16,185,129,.15); color: var(--success); }
+    .coming { background: rgba(245,158,11,.15); color: var(--warning); }
+    .footer { padding: 14px 16px 30px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="top-bar"><div class="left"><a class="logo-link" href="/"><i class="fas fa-atom"></i> Prenxy</a></div><div class="right"><a class="btn" href="/"><i class="fas fa-arrow-left"></i> Hub</a></div></div>
+  <main class="wrap">
+    <h1><i class="fas fa-cubes"></i> VM Workspaces</h1>
+    <p class="desc">Cloud virtual machines for coding and testing.</p>
+    <div class="resource-grid">
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#f97316,#ea580c)"><i class="fab fa-ubuntu"></i></div><h4>Ubuntu 24.04 LTS</h4><div class="rc-desc">VS Code, Python, Node 20. 2 vCPU / 4 GB RAM.</div><span class="rc-badge active">Available</span></div>
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)"><i class="fab fa-windows"></i></div><h4>Windows 11 Dev</h4><div class="rc-desc">Visual Studio, .NET 9. 2 vCPU / 8 GB RAM.</div><span class="rc-badge coming">Coming Soon</span></div>
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#10b981,#059669)"><i class="fab fa-python"></i></div><h4>Python Data Science</h4><div class="rc-desc">Jupyter, Pandas, TensorFlow. 4 vCPU / 8 GB RAM.</div><span class="rc-badge active">Available</span></div>
+    </div>
+  </main>
+  <div class="footer"><a href="/vm.html?desktop=1">Switch to desktop version</a></div>
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'liquid-glass');</script>
+</body>
+</html>

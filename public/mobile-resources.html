@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="liquid-glass">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Prenxy Student Resources</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    .wrap { padding: 16px; max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    .desc { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+    .section-tabs { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 12px; }
+    .section-tab { border: 1px solid var(--border); background: var(--bg-card); padding: 7px 11px; border-radius: 999px; white-space: nowrap; color: var(--text-secondary); }
+    .section-tab.active { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; }
+    .resource-grid { display: grid; gap: 10px; }
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; }
+    .muted { color: var(--text-muted); font-size: 12px; }
+    .footer { padding: 14px 16px 30px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="top-bar"><div class="left"><a class="logo-link" href="/"><i class="fas fa-atom"></i> Prenxy</a></div><div class="right"><a class="btn" href="/"><i class="fas fa-arrow-left"></i> Hub</a></div></div>
+  <main class="wrap">
+    <h1><i class="fas fa-graduation-cap"></i> Student Resources</h1>
+    <p class="desc">Classroom files, guides, and quick references.</p>
+    <div class="section-tabs">
+      <button class="section-tab active" onclick="showResourceTab('classroom',this)">Classroom</button>
+      <button class="section-tab" onclick="showResourceTab('guides',this)">Guides</button>
+      <button class="section-tab" onclick="showResourceTab('refs',this)">Quick Refs</button>
+      <button class="section-tab" onclick="showResourceTab('tools',this)">Tools</button>
+    </div>
+    <div class="resource-tab" id="tab-classroom">
+      <div class="resource-grid">
+        <div class="card"><div><strong>Course Syllabus — Spring 2026.pdf</strong></div><div class="muted">PDF · 245 KB · Feb 14, 2026</div></div>
+        <div class="card"><div><strong>Week 7 — Data Structures Slides.pptx</strong></div><div class="muted">PPTX · 3.2 MB · Feb 18, 2026</div></div>
+        <div class="card"><div><strong>Assignment 3 — Sorting Algorithms.zip</strong></div><div class="muted">ZIP · 128 KB · Due Mar 1, 2026</div></div>
+      </div>
+    </div>
+    <div class="resource-tab" id="tab-guides" style="display:none"><div class="resource-grid"><div class="card"><strong>Algorithms Cheat Sheet</strong><div class="muted">Big-O, sorting, graphs, DP patterns.</div></div><div class="card"><strong>SQL Mastery Guide</strong><div class="muted">JOINs, windows, indexing.</div></div></div></div>
+    <div class="resource-tab" id="tab-refs" style="display:none"><div class="resource-grid"><div class="card"><strong>HTML/CSS Reference</strong><div class="muted">Tags, Flexbox, Grid.</div></div><div class="card"><strong>Keyboard Shortcuts</strong><div class="muted">VS Code, Git, terminal.</div></div></div></div>
+    <div class="resource-tab" id="tab-tools" style="display:none"><div class="resource-grid"><div class="card"><strong>Code Formatter</strong><div class="muted">Auto-format common languages.</div></div><div class="card"><strong>Pomodoro Timer</strong><div class="muted">Focus sessions and breaks.</div></div></div></div>
+  </main>
+  <div class="footer"><a href="/resources.html?desktop=1">Switch to desktop version</a></div>
+  <script>
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'liquid-glass');
+    function showResourceTab(tab, btn){
+      document.querySelectorAll('.resource-tab').forEach(t => t.style.display = 'none');
+      document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+      const el = document.getElementById('tab-' + tab);
+      if (el) el.style.display = '';
+      if (btn) btn.classList.add('active');
+    }
+  </script>
+</body>
+</html>

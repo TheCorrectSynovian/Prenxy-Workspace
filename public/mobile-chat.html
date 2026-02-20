@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="liquid-glass">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Prenxy Chat</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    html { overflow: clip; }
+    html, body { height: 100%; }
+    body { display: flex; flex-direction: column; height: 100dvh; -webkit-tap-highlight-color: transparent; }
+
+    /* ═══ TOP BAR ═══ */
+    .top-bar { padding: 10px 16px; flex-shrink: 0; }
+
+    /* ═══ VIEW PANELS ═══ */
+    .chat-app { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; overflow: hidden; }
+
+    /* --- Contact List Panel --- */
+    .contacts-panel {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      background: var(--bg-primary); z-index: 2;
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+    }
+    .contacts-panel.hidden { transform: translateX(-100%); pointer-events: none; }
+    .contacts-head { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .contacts-head h2 { font-size: 18px; font-weight: 800; margin-bottom: 10px; }
+    .search-box { position: relative; }
+    .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; }
+    .search-box input { padding: 12px 14px 12px 36px; font-size: 16px !important; border-radius: var(--radius-md); }
+
+    .contact-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .contact {
+      display: flex; gap: 12px; padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      -webkit-tap-highlight-color: transparent; cursor: pointer;
+      transition: background .15s;
+    }
+    .contact:active { background: var(--bg-hover); }
+    .contact.active { background: rgba(59,130,246,.1); border-left: 3px solid var(--accent-primary); }
+    .contact.holding {
+      background: color-mix(in srgb, var(--accent-primary), transparent 86%);
+      transform: scale(.992);
+    }
+    .contact-meta { flex: 1; min-width: 0; }
+    .contact-top { display: flex; justify-content: space-between; gap: 8px; }
+    .contact-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .contact-time { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+    .contact-last { font-size: 13px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .unread {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 20px; height: 20px; padding: 0 6px;
+      font-size: 11px; font-weight: 700; color: #fff; background: var(--danger);
+      border-radius: 999px; margin-top: 4px;
+    }
+
+    /* --- Chat Panel --- */
+    .chat-panel {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      background: var(--bg-primary); z-index: 1;
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+    }
+    .chat-panel.active { z-index: 3; }
+    .chat-panel:not(.active) { transform: translateX(100%); pointer-events: none; }
+    .chat-head {
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    .back-btn {
+      width: 36px; height: 36px; border: none; border-radius: 50%;
+      background: var(--bg-tertiary); color: var(--text-primary); font-size: 16px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; -webkit-tap-highlight-color: transparent;
+    }
+    .back-btn:active { background: var(--bg-hover); }
+    .chat-title { font-size: 15px; font-weight: 700; }
+    .chat-sub { font-size: 12px; color: var(--text-muted); }
+
+    /* messages */
+    .messages { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 10px; }
+    .msg-row { display: flex; gap: 6px; }
+    .msg-row.mine { justify-content: flex-end; }
+    .msg-col { max-width: 85%; display: flex; flex-direction: column; gap: 3px; }
+    .bubble {
+      padding: 10px 14px; border-radius: 18px;
+      border: 1px solid var(--border); background: var(--bg-secondary);
+      white-space: pre-wrap; word-wrap: break-word; line-height: 1.5; font-size: 15px;
+    }
+    .bubble.holding {
+      transform: scale(.992);
+      background: color-mix(in srgb, var(--accent-primary), transparent 86%);
+    }
+    .mine .bubble { background: var(--accent-gradient); color: #fff; border: none; border-bottom-right-radius: 6px; }
+    .other .bubble { border-bottom-left-radius: 6px; }
+
+    .msg-files { display: grid; gap: 6px; }
+    .file-card {
+      border: 1px solid var(--border); background: var(--bg-tertiary);
+      border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .file-card img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; }
+    .file-card video { width: 100%; max-height: 200px; border-radius: 10px; }
+    .file-card audio { width: 100%; }
+    .file-meta { font-size: 12px; color: var(--text-secondary); display: flex; gap: 6px; align-items: center; }
+    .file-meta a { font-weight: 600; }
+
+    .msg-foot { display: flex; align-items: center; gap: 6px; }
+    .msg-time { font-size: 11px; color: var(--text-muted); }
+    .report-btn { border: none; background: none; color: var(--text-muted); font-size: 11px; cursor: pointer; padding: 4px; }
+    .seen-check { font-size: 10px; margin-left: 2px; }
+    .seen-check.read { color: var(--accent-primary); }
+    .seen-check.sent { color: var(--text-muted); opacity: .5; }
+    .seen-label { font-size: 10px; color: var(--text-muted); opacity: .7; margin-left: 2px; }
+
+    /* typing */
+    .typing-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--accent-primary); font-weight: 500; }
+    .typing-dots { display: inline-flex; gap: 3px; }
+    .typing-dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-primary); animation: typingBounce 1.4s ease-in-out infinite; }
+    .typing-dots span:nth-child(2) { animation-delay: .2s; }
+    .typing-dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes typingBounce { 0%,60%,100% { transform: translateY(0); opacity: .4; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+    /* composer */
+    .composer {
+      border-top: 1px solid var(--border); flex-shrink: 0;
+      padding: 8px 12px calc(env(safe-area-inset-bottom, 8px) + 8px);
+      display: flex; flex-direction: column; gap: 8px; background: var(--bg-primary);
+    }
+    .pending-files { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pfile {
+      font-size: 11px; border: 1px solid var(--border); border-radius: 999px;
+      padding: 4px 10px; display: inline-flex; align-items: center; gap: 6px; background: var(--bg-tertiary);
+    }
+    .pfile button { border: none; background: none; color: var(--danger); cursor: pointer; font-size: 12px; padding: 2px; }
+    .compose-row { display: flex; gap: 8px; align-items: flex-end; }
+    .compose-tools { display: flex; gap: 4px; }
+    .tool-btn {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1px solid var(--border); background: var(--bg-tertiary);
+      color: var(--text-secondary); cursor: pointer; display: flex;
+      align-items: center; justify-content: center; font-size: 16px;
+      flex-shrink: 0;
+    }
+    .tool-btn:active { background: var(--bg-hover); }
+    .tool-btn.recording { border-color: var(--danger); color: var(--danger); animation: pulseRec 1s infinite; }
+    @keyframes pulseRec { 50% { box-shadow: 0 0 0 3px rgba(220,38,38,.18); } }
+    .compose-row textarea {
+      flex: 1; min-height: 40px; max-height: 100px; resize: none;
+      font-size: 16px !important; padding: 10px 14px; border-radius: 20px;
+      line-height: 1.4;
+    }
+    .send-btn {
+      width: 44px; height: 44px; border: none; border-radius: 50%;
+      background: var(--accent-gradient); color: #fff; cursor: pointer;
+      font-size: 16px; flex-shrink: 0;
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+    .send-btn:disabled { opacity: .4; }
+
+    .empty-hero {
+      position: relative; height: 100%; width: 100%;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 14px; overflow: hidden;
+    }
+    .empty-hero .blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .12; animation: blobFloat 8s ease-in-out infinite; }
+    .empty-hero .blob-1 { width: 160px; height: 160px; background: var(--accent-primary); top: 10%; left: 20%; }
+    .empty-hero .blob-2 { width: 120px; height: 120px; background: #a855f7; bottom: 15%; right: 15%; animation-delay: -3s; }
+    .empty-hero .blob-3 { width: 100px; height: 100px; background: #38bdf8; top: 50%; left: 55%; animation-delay: -5s; }
+    @keyframes blobFloat { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(20px,-15px) scale(1.05); } 66% { transform: translate(-15px,20px) scale(.95); } }
+    .hero-content { position: relative; z-index: 1; text-align: center; }
+    .wave { font-size: 48px; display: block; margin-bottom: 8px; }
+    .hero-title { font-size: 20px; font-weight: 800; }
+    .hero-sub { font-size: 13px; color: var(--text-muted); line-height: 1.5; max-width: 260px; margin: 0 auto; }
+
+    .hidden { display: none !important; }
+
+    /* ═══ 2026 MOBILE TOUCH REMASTER ═══ */
+    @keyframes mobileChatAura {
+      0%,100% { transform: translate3d(0,0,0) scale(1); opacity: .25; }
+      50% { transform: translate3d(0,-9px,0) scale(1.08); opacity: .44; }
+    }
+    body::before,
+    body::after {
+      content: '';
+      position: fixed;
+      pointer-events: none;
+      z-index: -1;
+      border-radius: 50%;
+      filter: blur(56px);
+      animation: mobileChatAura 9s ease-in-out infinite;
+    }
+    body::before {
+      width: 200px;
+      height: 200px;
+      top: 74px;
+      right: -60px;
+      background: radial-gradient(circle, rgba(56,189,248,.3), rgba(56,189,248,0) 72%);
+    }
+    body::after {
+      width: 220px;
+      height: 220px;
+      left: -80px;
+      bottom: 92px;
+      background: radial-gradient(circle, rgba(16,185,129,.2), rgba(16,185,129,0) 72%);
+      animation-delay: -3s;
+    }
+    .top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 120;
+      backdrop-filter: blur(16px) saturate(130%);
+      -webkit-backdrop-filter: blur(16px) saturate(130%);
+      background: color-mix(in srgb, var(--bg-secondary), transparent 16%);
+      border-bottom: 1.5px solid color-mix(in srgb, var(--border), #7dd3fc 18%);
+    }
+    .tool-btn,.send-btn,.back-btn,.contact { touch-action: manipulation; }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div class="left">
+      <a class="logo-link" href="/"><i class="fas fa-arrow-left"></i> Hub</a>
+      <span style="font-weight:700;font-size:16px;margin-left:8px"><i class="fas fa-comments" style="margin-right:6px;opacity:.6"></i>Chat</span>
+    </div>
+    <div class="right">
+      <div class="user-chip">
+        <div class="avatar sm" id="topAvatar"></div>
+        <span id="topName">user</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-app">
+    <!-- Contact list (full screen on mobile) -->
+    <div class="contacts-panel" id="contactsPanel">
+      <div class="contacts-head">
+        <h2><i class="fas fa-user-friends"></i> Conversations</h2>
+        <div class="search-box">
+          <i class="fas fa-search"></i>
+          <input id="contactSearch" type="text" placeholder="Search contacts..." inputmode="search">
+        </div>
+      </div>
+      <div class="contact-list" id="contactList">
+        <div class="empty-hero" style="height:200px;padding:30px">
+          <div class="hero-content"><div style="font-size:14px;color:var(--text-muted)">Loading contacts...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat view (slides in from right) -->
+    <div class="chat-panel" id="chatPanel">
+      <div class="chat-head">
+        <button class="back-btn" id="backBtn"><i class="fas fa-arrow-left"></i></button>
+        <div class="avatar" id="chatAvatar">?</div>
+        <div style="flex:1;min-width:0">
+          <div class="chat-title" id="chatTitle">Chat</div>
+          <div class="chat-sub" id="chatSub"></div>
+        </div>
+      </div>
+
+      <div class="messages" id="messages">
+        <div class="empty-hero">
+          <div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div>
+          <div class="hero-content"><span class="wave">👋</span><div class="hero-title">Say hi!</div><div class="hero-sub">Pick a conversation to start chatting.</div></div>
+        </div>
+      </div>
+
+      <div class="composer" id="composer">
+        <div class="pending-files" id="pendingFiles"></div>
+        <div class="compose-row">
+          <div class="compose-tools">
+            <button class="tool-btn" id="btnAttach" title="Attach"><i class="fas fa-paperclip"></i></button>
+            <button class="tool-btn" id="btnRecord" title="Record"><i class="fas fa-microphone"></i></button>
+          </div>
+          <textarea id="msgInput" placeholder="Message..." rows="1"></textarea>
+          <button class="send-btn" id="btnSend" disabled><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+
+      <input id="fileInput" type="file" multiple class="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.txt,.zip,.xls,.xlsx">
+    </div>
+  </div>
+
+  <div class="toast-container" id="toasts"></div>
+
+  <script>
+  (() => {
+    'use strict';
+    const state = {
+      profile: null, contacts: [], selected: null, messages: [],
+      pendingFiles: [], mediaRecorder: null, audioChunks: [],
+      typing: false, lastSeenAt: null, typingTimer: null,
+      prevUnreadMap: {}
+    };
+
+    // ═══ DM NOTIFICATION SOUND ═══
+    let _audioCtx = null;
+    function playNotificationSound() {
+      try {
+        if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = _audioCtx;
+        const now = ctx.currentTime;
+        [880, 1174.66].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.18, now + i * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.12);
+          osc.stop(now + i * 0.12 + 0.3);
+        });
+      } catch {}
+    }
+    function checkNewUnreads() {
+      let hasNew = false;
+      for (const c of state.contacts) {
+        const prev = state.prevUnreadMap[c.username] || 0;
+        if (c.unreadCount > prev && c.username !== state.selected) hasNew = true;
+        state.prevUnreadMap[c.username] = c.unreadCount;
+      }
+      if (hasNew) playNotificationSound();
+    }
+
+    function getToken() { return localStorage.getItem('authToken'); }
+    function authHeaders(extra = {}) { const h = { ...extra }; const t = getToken(); if (t) h.Authorization = 'Bearer ' + t; return h; }
+    async function authFetch(url, opts = {}) {
+      opts.headers = authHeaders(opts.headers || {});
+      const res = await fetch(url, opts);
+      if (res.status === 401) { window.location.href = '/'; throw new Error('AUTH'); }
+      return res;
+    }
+    function toast(msg, type = 'info') {
+      const el = document.createElement('div'); el.className = 'toast ' + type;
+      el.innerHTML = `<i class="fas fa-${type==='success'?'check-circle':type==='error'?'exclamation-circle':'info-circle'}"></i> ${msg}`;
+      document.getElementById('toasts').appendChild(el);
+      setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 320); }, 3200);
+    }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+    function avatarHTML(url, name, cls = 'avatar sm') {
+      if (url) return `<div class="${cls}"><img src="${url}" alt=""></div>`;
+      return `<div class="${cls}">${esc((name || '?')[0].toUpperCase())}</div>`;
+    }
+    function setAvatar(el, url, name) { el.innerHTML = url ? `<img src="${url}" alt="">` : esc((name || '?')[0].toUpperCase()); }
+    function timeShort(ts) {
+      if (!ts) return '';
+      const d = new Date(ts), diff = Date.now() - d.getTime();
+      if (diff < 60000) return 'now';
+      if (diff < 3600000) return Math.floor(diff / 60000) + 'm';
+      if (diff < 86400000) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleDateString();
+    }
+    function formatBytes(n) {
+      if (!n) return '0 B';
+      const u = ['B', 'KB', 'MB', 'GB']; let i = 0;
+      while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+      return `${n.toFixed(n >= 10 || i === 0 ? 0 : 1)} ${u[i]}`;
+    }
+
+    // ── Panel switching ──
+    function showContacts() {
+      document.getElementById('contactsPanel').classList.remove('hidden');
+      document.getElementById('chatPanel').classList.remove('active');
+    }
+    function showChat() {
+      document.getElementById('contactsPanel').classList.add('hidden');
+      document.getElementById('chatPanel').classList.add('active');
+    }
+    document.getElementById('backBtn').addEventListener('click', showContacts);
+
+    async function loadProfile() {
+      const res = await authFetch('/api/profile');
+      const p = await res.json(); state.profile = p;
+      document.getElementById('topName').textContent = p.displayName;
+      setAvatar(document.getElementById('topAvatar'), p.avatar, p.displayName);
+    }
+
+    function getFilteredContacts() {
+      const q = document.getElementById('contactSearch').value.trim().toLowerCase();
+      if (!q) return state.contacts;
+      return state.contacts.filter(c =>
+        (c.displayName || '').toLowerCase().includes(q) ||
+        (c.handle || '').toLowerCase().includes(q) || c.username.includes(q)
+      );
+    }
+
+    let contactHoldTimer = null, contactHoldX = 0, contactHoldY = 0;
+    function bindContactTouchActions(scope) {
+      scope.querySelectorAll('.contact').forEach(el => {
+        if (el.dataset.touchBound) return;
+        el.dataset.touchBound = '1';
+        el.addEventListener('touchstart', e => {
+          contactHoldX = e.touches?.[0]?.clientX || 0;
+          contactHoldY = e.touches?.[0]?.clientY || 0;
+          el.classList.add('holding');
+          contactHoldTimer = setTimeout(() => {
+            el.classList.remove('holding');
+            navigator.vibrate?.(18);
+            const label = el.querySelector('.contact-name')?.textContent?.trim() || 'Contact';
+            toast(`Open chat with ${label}`, 'info');
+            contactHoldTimer = null;
+          }, 460);
+        }, { passive: true });
+        el.addEventListener('touchmove', e => {
+          const x = e.touches?.[0]?.clientX || 0;
+          const y = e.touches?.[0]?.clientY || 0;
+          const moved = Math.abs(x - contactHoldX) > 10 || Math.abs(y - contactHoldY) > 10;
+          if (moved && contactHoldTimer) {
+            clearTimeout(contactHoldTimer);
+            contactHoldTimer = null;
+            el.classList.remove('holding');
+          }
+        }, { passive: true });
+        el.addEventListener('touchend', () => {
+          if (contactHoldTimer) clearTimeout(contactHoldTimer);
+          contactHoldTimer = null;
+          el.classList.remove('holding');
+        }, { passive: true });
+      });
+    }
+
+    function renderContacts() {
+      const list = document.getElementById('contactList');
+      const contacts = getFilteredContacts();
+      if (!contacts.length) {
+        list.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text-muted)"><i class="fas fa-user-slash" style="font-size:28px;opacity:.4;display:block;margin-bottom:8px"></i>No contacts</div>`;
+        return;
+      }
+      list.innerHTML = contacts.map(c => `
+        <div class="contact ${state.selected === c.username ? 'active' : ''}" data-user="${c.username}">
+          ${avatarHTML(c.avatar, c.displayName, 'avatar')}
+          <div class="contact-meta">
+            <div class="contact-top">
+              <div class="contact-name">${esc(c.displayName || c.username)}</div>
+              <div class="contact-time">${timeShort(c.lastMessageAt)}</div>
+            </div>
+            <div class="contact-last">${esc(c.lastMessage || c.handle || '@' + c.username)}</div>
+            ${c.unreadCount ? `<span class="unread">${c.unreadCount}</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+      list.querySelectorAll('.contact').forEach(el => {
+        el.addEventListener('click', () => openConversation(el.dataset.user));
+      });
+      bindContactTouchActions(list);
+    }
+
+    async function loadContacts() {
+      const res = await authFetch('/api/chat/contacts');
+      state.contacts = await res.json();
+      renderContacts();
+      if (state.selected && !state.contacts.some(c => c.username === state.selected)) {
+        state.selected = null; showContacts();
+      }
+    }
+
+    async function openConversation(username) {
+      if (!username) return;
+      state.selected = username;
+      renderContacts();
+      showChat();
+      await loadMessages();
+    }
+
+    function renderAttachment(a) {
+      const safeName = esc(a.name || 'attachment');
+      const safeUrl = a.url + (a.url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(getToken());
+      if (a.kind === 'image' || a.kind === 'gif') return `<div class="file-card"><img src="${safeUrl}" alt="${safeName}"><div class="file-meta"><i class="fas fa-image"></i><a href="${safeUrl}" target="_blank">${safeName}</a></div></div>`;
+      if (a.kind === 'audio') return `<div class="file-card"><audio controls src="${safeUrl}"></audio><div class="file-meta"><i class="fas fa-music"></i><a href="${safeUrl}" target="_blank">${safeName}</a> <span>(${formatBytes(a.size)})</span></div></div>`;
+      if (a.kind === 'video') return `<div class="file-card"><video controls src="${safeUrl}"></video><div class="file-meta"><i class="fas fa-video"></i><a href="${safeUrl}" target="_blank">${safeName}</a></div></div>`;
+      return `<div class="file-card"><div class="file-meta"><i class="fas fa-file-alt"></i><a href="${safeUrl}" target="_blank">${safeName}</a> <span>(${formatBytes(a.size)})</span></div></div>`;
+    }
+
+    function renderMessages() {
+      const box = document.getElementById('messages');
+      const contact = state.contacts.find(c => c.username === state.selected);
+
+      if (!state.selected) {
+        box.innerHTML = `<div class="empty-hero"><div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div><div class="hero-content"><span class="wave">👋</span><div class="hero-title">Say hi!</div><div class="hero-sub">Pick a conversation to start chatting.</div></div></div>`;
+        return;
+      }
+
+      setAvatar(document.getElementById('chatAvatar'), contact?.avatar || null, contact?.displayName || state.selected);
+      document.getElementById('chatTitle').textContent = contact?.displayName || state.selected;
+      const subEl = document.getElementById('chatSub');
+      if (state.typing) {
+        subEl.innerHTML = `<span class="typing-indicator"><span class="typing-dots"><span></span><span></span><span></span></span> typing...</span>`;
+      } else {
+        subEl.textContent = contact?.handle || ('@' + state.selected);
+      }
+
+      if (!state.messages.length) {
+        box.innerHTML = `<div class="empty-hero"><div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div><div class="hero-content"><span class="wave">👋</span><div class="hero-title">Say hi to ${esc(contact?.displayName || state.selected)}!</div><div class="hero-sub">Send the first message.</div></div></div>`;
+        return;
+      }
+
+      const lastSeenIdx = (() => { for (let i = state.messages.length - 1; i >= 0; i--) { if (state.messages[i].mine && state.messages[i].seen) return i; } return -1; })();
+
+      box.innerHTML = state.messages.map((m, idx) => {
+        const seenHTML = m.mine ? (m.seen
+          ? (idx === lastSeenIdx ? `<span class="seen-check read"><i class="fas fa-check-double"></i></span><span class="seen-label">Seen${state.lastSeenAt ? ' ' + timeShort(state.lastSeenAt) : ''}</span>` : `<span class="seen-check read"><i class="fas fa-check-double"></i></span>`)
+          : `<span class="seen-check sent"><i class="fas fa-check"></i></span>`) : '';
+        return `<div class="msg-row ${m.mine ? 'mine' : 'other'}"><div class="msg-col">
+          ${m.text ? `<div class="bubble" data-mid="${m.id}" data-mine="${m.mine ? '1' : '0'}">${esc(m.text)}</div>` : ''}
+          ${(m.attachments || []).length ? `<div class="msg-files">${m.attachments.map(renderAttachment).join('')}</div>` : ''}
+          <div class="msg-foot"><span class="msg-time">${timeShort(m.timestamp)}</span>${seenHTML}
+          ${(!m.mine && m.canReport && !m.reported) ? `<button class="report-btn" data-report="${m.id}"><i class="fas fa-flag"></i></button>` : ''}
+          ${m.reported ? `<span class="msg-time">Reported</span>` : ''}</div>
+        </div></div>`;
+      }).join('');
+
+      if (state.typing) {
+        box.innerHTML += `<div class="msg-row other"><div class="msg-col"><div class="typing-indicator" style="padding:6px 12px"><span class="typing-dots"><span></span><span></span><span></span></span> ${esc(contact?.displayName || state.selected)} is typing...</div></div></div>`;
+      }
+
+      box.querySelectorAll('[data-report]').forEach(btn => {
+        btn.addEventListener('click', () => reportMessage(btn.dataset.report));
+      });
+      bindMessageTouchActions();
+      box.scrollTop = box.scrollHeight;
+    }
+
+    let msgHoldTimer = null, msgHoldX = 0, msgHoldY = 0;
+    function bindMessageTouchActions() {
+      document.querySelectorAll('.bubble[data-mid]').forEach(bubble => {
+        if (bubble.dataset.touchBound) return;
+        bubble.dataset.touchBound = '1';
+        bubble.addEventListener('touchstart', e => {
+          msgHoldX = e.touches?.[0]?.clientX || 0;
+          msgHoldY = e.touches?.[0]?.clientY || 0;
+          bubble.classList.add('holding');
+          const mid = bubble.dataset.mid;
+          const mine = bubble.dataset.mine === '1';
+          msgHoldTimer = setTimeout(async () => {
+            navigator.vibrate?.(18);
+            const txt = bubble.textContent?.trim() || '';
+            if (txt) {
+              try { await navigator.clipboard.writeText(txt); toast('Message copied', 'success'); } catch {}
+            }
+            if (!mine && confirm('Report this message?')) {
+              reportMessage(mid);
+            }
+            bubble.classList.remove('holding');
+            msgHoldTimer = null;
+          }, 520);
+        }, { passive: true });
+        bubble.addEventListener('touchmove', e => {
+          const x = e.touches?.[0]?.clientX || 0;
+          const y = e.touches?.[0]?.clientY || 0;
+          const moved = Math.abs(x - msgHoldX) > 10 || Math.abs(y - msgHoldY) > 10;
+          if (moved && msgHoldTimer) {
+            clearTimeout(msgHoldTimer);
+            msgHoldTimer = null;
+            bubble.classList.remove('holding');
+          }
+        }, { passive: true });
+        bubble.addEventListener('touchend', () => {
+          if (msgHoldTimer) clearTimeout(msgHoldTimer);
+          msgHoldTimer = null;
+          bubble.classList.remove('holding');
+        }, { passive: true });
+      });
+    }
+
+    async function loadMessages() {
+      if (!state.selected) return;
+      const res = await authFetch(`/api/chat/messages/${encodeURIComponent(state.selected)}`);
+      const payload = await res.json();
+      state.messages = payload.messages || [];
+      state.typing = !!payload.typing;
+      state.lastSeenAt = payload.lastSeenAt || null;
+      renderMessages();
+    }
+
+    function addPendingFiles(list) {
+      for (const f of list) {
+        if (!f) continue;
+        if (state.pendingFiles.length >= 8) { toast('Max 8 attachments', 'warning'); break; }
+        state.pendingFiles.push(f);
+      }
+      renderPendingFiles(); updateSendState();
+    }
+
+    function renderPendingFiles() {
+      const el = document.getElementById('pendingFiles');
+      if (!state.pendingFiles.length) { el.innerHTML = ''; return; }
+      el.innerHTML = state.pendingFiles.map((f, idx) =>
+        `<span class="pfile">${esc(f.name)} <small>${formatBytes(f.size)}</small> <button data-rm="${idx}"><i class="fas fa-times"></i></button></span>`
+      ).join('');
+      el.querySelectorAll('[data-rm]').forEach(b => {
+        b.addEventListener('click', () => { state.pendingFiles.splice(Number(b.dataset.rm), 1); renderPendingFiles(); updateSendState(); });
+      });
+    }
+
+    function updateSendState() {
+      const hasText = document.getElementById('msgInput').value.trim().length > 0;
+      const canSend = !!state.selected && (hasText || state.pendingFiles.length > 0);
+      document.getElementById('btnSend').disabled = !canSend;
+      document.getElementById('composer').style.opacity = state.selected ? '1' : '.6';
+      document.getElementById('msgInput').disabled = !state.selected;
+    }
+
+    async function sendMessage() {
+      if (!state.selected) return;
+      const text = document.getElementById('msgInput').value.trim();
+      if (!text && !state.pendingFiles.length) return;
+      const fd = new FormData();
+      fd.append('to', state.selected);
+      if (text) fd.append('text', text);
+      state.pendingFiles.forEach(f => fd.append('files', f));
+      document.getElementById('btnSend').disabled = true;
+      try {
+        const res = await authFetch('/api/chat/messages', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Failed');
+        document.getElementById('msgInput').value = '';
+        state.pendingFiles = []; renderPendingFiles();
+        await loadMessages(); await loadContacts();
+      } catch (e) { toast(e.message || 'Failed', 'error'); }
+      finally { updateSendState(); }
+    }
+
+    async function reportMessage(messageId) {
+      const reason = prompt('Reason for reporting:');
+      if (!reason?.trim()) return;
+      try {
+        const res = await authFetch(`/api/chat/messages/${encodeURIComponent(messageId)}/report`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: reason.trim(), details: '' })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+        toast('Reported', 'success'); await loadMessages();
+      } catch (e) { toast(e.message || 'Failed', 'error'); }
+    }
+
+    async function toggleVoiceRecording() {
+      const btn = document.getElementById('btnRecord');
+      if (state.mediaRecorder && state.mediaRecorder.state === 'recording') { state.mediaRecorder.stop(); btn.classList.remove('recording'); return; }
+      if (!navigator.mediaDevices || !window.MediaRecorder) { toast('Not supported', 'warning'); return; }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        state.audioChunks = [];
+        const rec = new MediaRecorder(stream); state.mediaRecorder = rec;
+        rec.ondataavailable = e => { if (e.data?.size) state.audioChunks.push(e.data); };
+        rec.onstop = () => {
+          const blob = new Blob(state.audioChunks, { type: rec.mimeType || 'audio/webm' });
+          const ext = (rec.mimeType || '').includes('mp4') ? 'm4a' : 'webm';
+          addPendingFiles([new File([blob], `voice-${Date.now()}.${ext}`, { type: rec.mimeType || 'audio/webm' })]);
+          stream.getTracks().forEach(t => t.stop());
+          toast('Voice note attached', 'success');
+        };
+        rec.start(); btn.classList.add('recording'); toast('Recording...', 'info');
+      } catch { toast('Mic access denied', 'error'); }
+    }
+
+    // Auto-resize textarea
+    const msgInput = document.getElementById('msgInput');
+    msgInput.addEventListener('input', () => {
+      msgInput.style.height = 'auto';
+      msgInput.style.height = Math.min(msgInput.scrollHeight, 100) + 'px';
+      updateSendState();
+      if (state.selected) {
+        clearTimeout(state.typingTimer);
+        authFetch(`/api/chat/typing/${encodeURIComponent(state.selected)}`, { method: 'POST' }).catch(() => {});
+        state.typingTimer = setTimeout(() => {}, 3000);
+      }
+    });
+
+    document.getElementById('contactSearch').addEventListener('input', renderContacts);
+    document.getElementById('btnSend').addEventListener('click', sendMessage);
+    msgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+    document.getElementById('btnAttach').addEventListener('click', () => document.getElementById('fileInput').click());
+    document.getElementById('btnRecord').addEventListener('click', toggleVoiceRecording);
+    document.getElementById('fileInput').addEventListener('change', e => { addPendingFiles(Array.from(e.target.files || [])); e.target.value = ''; });
+
+    // Swipe right on chat panel to return to contacts
+    let chatSwipeStartX = 0, chatSwipeStartY = 0, chatSwipeActive = false;
+    const chatPanel = document.getElementById('chatPanel');
+    chatPanel.addEventListener('touchstart', e => {
+      chatSwipeStartX = e.touches?.[0]?.clientX || 0;
+      chatSwipeStartY = e.touches?.[0]?.clientY || 0;
+      chatSwipeActive = chatPanel.classList.contains('active');
+    }, { passive: true });
+    chatPanel.addEventListener('touchmove', e => {
+      if (!chatSwipeActive) return;
+      const x = e.touches?.[0]?.clientX || 0;
+      const y = e.touches?.[0]?.clientY || 0;
+      const dx = x - chatSwipeStartX;
+      const dy = Math.abs(y - chatSwipeStartY);
+      if (chatSwipeStartX < 44 && dx > 70 && dy < 40) {
+        chatSwipeActive = false;
+        navigator.vibrate?.(14);
+        showContacts();
+      }
+    }, { passive: true });
+
+    (async () => {
+      const saved = localStorage.getItem('theme') || 'liquid-glass';
+      document.documentElement.setAttribute('data-theme', saved);
+      if (!getToken()) { window.location.href = '/'; return; }
+      try {
+        await loadProfile();
+        await loadContacts();
+        updateSendState();
+        // Auto-open first unread
+        if (!state.selected && state.contacts.length) {
+          const first = state.contacts.find(c => c.unreadCount > 0) || state.contacts[0];
+          openConversation(first.username);
+        }
+        setInterval(async () => {
+          try { await loadContacts(); checkNewUnreads(); if (state.selected) await loadMessages(); } catch {}
+        }, 5000);
+      } catch { window.location.href = '/'; }
+    })();
+  })();
+  </script>
+</body>
+</html>

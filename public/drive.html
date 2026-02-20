@@ -3559,6 +3559,241 @@
       color: var(--danger);
       border-color: var(--danger);
     }
+
+    /* ===== 2026 REMASTER LAYER ===== */
+    @keyframes remasterGlowFloat {
+      0%, 100% { transform: translate3d(0,0,0) scale(1); opacity: .35; }
+      50% { transform: translate3d(0,-12px,0) scale(1.08); opacity: .55; }
+    }
+    @keyframes remasterPanelIn {
+      from { opacity: 0; transform: translateY(8px) scale(.99); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes remasterCardIn {
+      from { opacity: 0; transform: translateY(18px) scale(.985); filter: blur(2px); }
+      to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    }
+    .app::before,
+    .app::after {
+      content: '';
+      position: fixed;
+      pointer-events: none;
+      z-index: 0;
+      border-radius: 50%;
+      filter: blur(65px);
+      animation: remasterGlowFloat 9s ease-in-out infinite;
+    }
+    .app::before {
+      width: 280px;
+      height: 280px;
+      top: 70px;
+      right: -70px;
+      background: radial-gradient(circle, rgba(14,165,233,.33), rgba(14,165,233,0) 70%);
+    }
+    .app::after {
+      width: 320px;
+      height: 320px;
+      left: -120px;
+      bottom: 70px;
+      background: radial-gradient(circle, rgba(16,185,129,.22), rgba(16,185,129,0) 70%);
+      animation-delay: -3s;
+    }
+    .header,
+    .toolbar,
+    .selection-bar {
+      backdrop-filter: blur(18px) saturate(125%);
+      -webkit-backdrop-filter: blur(18px) saturate(125%);
+      border-color: color-mix(in srgb, var(--border), #60a5fa 20%);
+    }
+    .header {
+      box-shadow: 0 14px 32px rgba(2, 6, 23, 0.28);
+      animation: remasterPanelIn .45s ease both;
+    }
+    .toolbar {
+      border-radius: 18px;
+      margin: 12px 14px 0;
+      animation: remasterPanelIn .5s ease both;
+      animation-delay: .06s;
+    }
+    .content-area {
+      padding-top: 18px;
+    }
+    .btn,
+    .btn-icon,
+    .search-input,
+    select {
+      transition: transform .18s ease, box-shadow .22s ease, border-color .22s ease, background .22s ease;
+    }
+    .btn:hover,
+    .btn-icon:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(2, 6, 23, .2);
+    }
+    .search-input:focus,
+    select:focus {
+      border-color: color-mix(in srgb, var(--accent-primary), white 20%);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary), transparent 75%);
+    }
+    .file-grid {
+      gap: 16px;
+    }
+    .file-card {
+      border-width: 1.5px;
+      box-shadow: 0 10px 24px rgba(2, 6, 23, .16);
+      animation: remasterCardIn .45s ease both;
+      transform-origin: center bottom;
+    }
+    .file-card:nth-child(2n) { animation-delay: .03s; }
+    .file-card:nth-child(3n) { animation-delay: .06s; }
+    .file-card:hover {
+      transform: translateY(-7px) scale(1.012);
+      box-shadow: 0 18px 34px rgba(2, 6, 23, .24);
+    }
+    .file-card-preview {
+      border-radius: 12px 12px 0 0;
+      overflow: hidden;
+    }
+    .file-card-name {
+      letter-spacing: .1px;
+    }
+    .file-card-meta {
+      margin-top: 7px;
+    }
+    .modal {
+      border-width: 1.5px;
+      box-shadow: 0 26px 54px rgba(2, 6, 23, .3);
+    }
+    .command-palette {
+      border-width: 1.5px;
+      box-shadow: 0 30px 60px rgba(2, 6, 23, .35);
+      backdrop-filter: blur(20px) saturate(120%);
+      -webkit-backdrop-filter: blur(20px) saturate(120%);
+    }
+    .command-item {
+      border-radius: 10px;
+      margin: 3px 6px;
+    }
+    .context-menu {
+      border-width: 1.5px;
+      box-shadow: 0 20px 40px rgba(2, 6, 23, .35);
+    }
+    .stats-card,
+    .theme-picker-panel,
+    .docx-content-wrapper,
+    .image-viewer-panel {
+      box-shadow: 0 18px 40px rgba(2, 6, 23, .24);
+    }
+    @media (max-width: 768px) {
+      .toolbar {
+        margin: 10px 10px 0;
+        border-radius: 14px;
+      }
+      .file-grid {
+        gap: 12px;
+      }
+      .file-card:hover {
+        transform: translateY(-4px) scale(1.006);
+      }
+      .app::before {
+        width: 220px;
+        height: 220px;
+      }
+      .app::after {
+        width: 220px;
+        height: 220px;
+      }
+    }
+
+    /* ===== 2026 DESKTOP DEEP REMASTER ===== */
+    @keyframes driveDeskIn {
+      from { opacity: 0; transform: translateY(16px) scale(.992); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @media (min-width: 980px) {
+      .header {
+        height: 74px;
+        padding: 0 18px;
+      }
+      .header-left {
+        gap: 18px;
+      }
+      .header-center {
+        max-width: 680px;
+      }
+      .search-input {
+        padding: 11px 14px;
+        border-width: 1.5px;
+      }
+      .toolbar {
+        margin: 14px 18px 0;
+        padding: 12px 14px;
+        min-height: 70px;
+      }
+      .content-area {
+        padding: 20px 18px 28px;
+      }
+      .category-group-header {
+        padding: 18px 4px 10px;
+      }
+      .file-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 18px;
+      }
+      .file-card {
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      .file-card-body {
+        padding: 12px;
+      }
+      .file-list {
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      .file-list-item {
+        padding-top: 12px;
+        padding-bottom: 12px;
+      }
+      .viewer-header,
+      .image-viewer-header,
+      .docx-viewer-header {
+        height: 70px;
+        border-bottom-width: 1.5px;
+      }
+      .viewer-body {
+        padding: 16px;
+      }
+      .modal {
+        border-radius: 20px;
+        animation: driveDeskIn .42s ease both;
+      }
+      .theme-picker-panel {
+        border-radius: 20px;
+      }
+      .theme-card {
+        border-width: 1.5px;
+      }
+      .theme-card:hover {
+        transform: translateY(-4px);
+      }
+      .command-palette {
+        border-radius: 16px;
+      }
+      .fab {
+        width: 64px;
+        height: 64px;
+        box-shadow: 0 18px 34px color-mix(in srgb, var(--accent-primary), transparent 74%);
+      }
+      .fab-menu-item {
+        box-shadow: 0 12px 24px rgba(2, 6, 23, .22);
+      }
+      #statsContent > div {
+        animation: driveDeskIn .36s ease both;
+      }
+      #statsContent > div:nth-child(2n) {
+        animation-delay: .03s;
+      }
+    }
   </style>
 </head>
 
@@ -4008,7 +4243,7 @@
 
   <!-- Stats Modal -->
   <div class="modal-overlay" id="statsModal">
-    <div class="modal" style="max-width:440px">
+    <div class="modal" style="max-width:1100px">
       <div class="modal-header">
         <h2><i class="fas fa-chart-bar" style="color:var(--accent-secondary);margin-right:8px"></i> Dashboard</h2>
         <button class="modal-close" id="statsModalClose"><i class="fas fa-times"></i></button>
@@ -4190,6 +4425,7 @@
       classroomShared: [],   // admin: list of filenames shared to classroom
       classroomFiles: [],    // student: files from admin's classroom
       showClassroom: false,  // student: toggle classroom view
+      adminAccounts: [],
     };
 
     const konamiCode = [38,38,40,40,37,39,37,39,66,65]; // ↑↑↓↓←→←→BA
@@ -6598,6 +6834,13 @@
         { icon: 'fa-random', label: 'Open Random Document', action: () => openRandom() },
         { icon: 'fa-egg', label: '🥚 Secret...', action: () => fetchSecret() },
       ];
+      if (state.role === 'admin') {
+        commands.push(
+          { icon: 'fa-terminal', label: 'Open Admin Dashboard', action: () => showStatsModal() },
+          { icon: 'fa-hashtag', label: 'Open Social App', action: () => openAdminApp('social') },
+          { icon: 'fa-comments', label: 'Open Chat App', action: () => openAdminApp('chat') }
+        );
+      }
 
       // Add files
       const fileCommands = state.files.map(f => ({
@@ -6632,12 +6875,218 @@
       }
     }
 
+    function appendAdminTerminalLine(line, type = 'info') {
+      const out = $('adminTerminalOutput');
+      if (!out) return;
+      const color = type === 'error' ? 'var(--danger)' : (type === 'ok' ? 'var(--success)' : 'var(--text-secondary)');
+      const row = document.createElement('div');
+      row.style.color = color;
+      row.style.padding = '2px 0';
+      row.textContent = line;
+      out.appendChild(row);
+      out.scrollTop = out.scrollHeight;
+    }
+
+    function appendAdminSandboxLine(line, type = 'info') {
+      const out = $('adminSandboxOutput');
+      if (!out) return;
+      const color = type === 'error' ? '#fca5a5' : (type === 'ok' ? '#86efac' : '#cbd5e1');
+      const row = document.createElement('div');
+      row.style.color = color;
+      row.style.padding = '2px 0';
+      row.style.whiteSpace = 'pre-wrap';
+      row.textContent = line;
+      out.appendChild(row);
+      out.scrollTop = out.scrollHeight;
+    }
+
+    async function refreshAdminAccounts() {
+      if (state.role !== 'admin') return;
+      try {
+        const res = await authFetch('/api/admin/accounts');
+        if (!res.ok) throw new Error('Failed to fetch accounts');
+        state.adminAccounts = await res.json();
+        const list = $('adminAccountsList');
+        if (list) {
+          if (!state.adminAccounts.length) {
+            list.innerHTML = '<div style="color:var(--text-muted);font-size:12px">No managed accounts yet.</div>';
+          } else {
+            list.innerHTML = state.adminAccounts.map(a => `
+              <div style="display:grid;grid-template-columns:1.2fr .8fr 1fr;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg-secondary);font-size:12px">
+                <div style="font-weight:600">${esc(a.username)}</div>
+                <div style="text-transform:capitalize">${esc(a.role || 'user')}</div>
+                <div style="color:var(--text-muted)">${esc(a.createdBy || '-')}</div>
+              </div>
+            `).join('');
+          }
+        }
+      } catch (e) {
+        appendAdminTerminalLine('Error loading account list: ' + (e.message || 'unknown error'), 'error');
+      }
+    }
+
+    async function createManagedAccountFromDashboard() {
+      const username = ($('adminNewUsername')?.value || '').trim();
+      const password = ($('adminNewPassword')?.value || '').trim();
+      const role = ($('adminNewRole')?.value || '').trim();
+      const parentAdmin = ($('adminParentAdmin')?.value || '').trim();
+      const displayName = ($('adminDisplayName')?.value || '').trim();
+      if (!username || !password || !role) {
+        toast('Username, password and role are required', 'error');
+        return;
+      }
+      try {
+        const res = await authFetch('/api/admin/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, role, parentAdmin, displayName })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Failed to create account');
+        toast(`Created ${data.account.role}: ${data.account.username}`, 'success');
+        appendAdminTerminalLine(`Created ${data.account.role} account: ${data.account.username}`, 'ok');
+        if ($('adminNewUsername')) $('adminNewUsername').value = '';
+        if ($('adminNewPassword')) $('adminNewPassword').value = '';
+        if ($('adminDisplayName')) $('adminDisplayName').value = '';
+        await refreshAdminAccounts();
+      } catch (e) {
+        toast(e.message || 'Failed to create account', 'error');
+        appendAdminTerminalLine('Create account failed: ' + (e.message || 'unknown error'), 'error');
+      }
+    }
+
+    async function runAdminTerminalCommand(raw) {
+      const input = String(raw || '').trim();
+      if (!input) return;
+      appendAdminTerminalLine('> ' + input, 'info');
+      try {
+        const res = await authFetch('/api/admin/terminal/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: input })
+        });
+        const data = await res.json();
+        const lines = String(data.output || '').split('\n').filter(Boolean);
+        if (!lines.length) appendAdminTerminalLine('(no output)', res.ok ? 'ok' : 'error');
+        lines.forEach(line => appendAdminTerminalLine(line, res.ok ? 'ok' : 'error'));
+        if (res.ok && /(create-|delete-account|set-role|reset-password)/.test(input)) {
+          refreshAdminAccounts();
+        }
+      } catch (e) {
+        appendAdminTerminalLine('Command failed: ' + (e.message || 'unknown error'), 'error');
+      }
+    }
+
+    async function runAdminSandboxCommand(raw) {
+      const input = String(raw || '').trim();
+      if (!input) return;
+      const promptEl = $('adminSandboxPrompt');
+      const prompt = promptEl ? promptEl.textContent : '~/';
+      appendAdminSandboxLine(`${prompt} $ ${input}`, 'info');
+      try {
+        const res = await authFetch('/api/admin/sandbox/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: input })
+        });
+        const data = await res.json();
+        if (data.cwd && promptEl) promptEl.textContent = data.cwd;
+        if (String(data.output || '') === '__CLEAR__') {
+          const out = $('adminSandboxOutput');
+          if (out) out.innerHTML = '';
+          return;
+        }
+        const lines = String(data.output || '').split('\n');
+        if (!lines.length || (lines.length === 1 && !lines[0])) appendAdminSandboxLine('(no output)', res.ok ? 'ok' : 'error');
+        else lines.forEach(line => appendAdminSandboxLine(line, res.ok ? 'ok' : 'error'));
+      } catch (e) {
+        appendAdminSandboxLine('Command failed: ' + (e.message || 'unknown error'), 'error');
+      }
+    }
+
+    function bindAdminDashboardEventsOnce() {
+      const input = $('adminTerminalInput');
+      if (input && !input.dataset.bound) {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const value = input.value;
+            input.value = '';
+            runAdminTerminalCommand(value);
+          }
+        });
+        input.dataset.bound = '1';
+      }
+      const sandboxInput = $('adminSandboxInput');
+      if (sandboxInput && !sandboxInput.dataset.bound) {
+        sandboxInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const value = sandboxInput.value;
+            sandboxInput.value = '';
+            runAdminSandboxCommand(value);
+          }
+        });
+        sandboxInput.dataset.bound = '1';
+      }
+    }
+
+    function openAdminApp(appId) {
+      if (appId === 'social') window.open('/social.html', '_blank');
+      if (appId === 'chat') window.open('/chat.html', '_blank');
+      if (appId === 'docs') window.open('/drive.html', '_blank');
+    }
+
     // ===== STATS MODAL =====
     async function showStatsModal() {
       el.statsModal.classList.add('active');
       try {
         const res = await authFetch('/api/stats');
         const data = await res.json();
+        const adminTools = state.role === 'admin' ? `
+          <div style="background:var(--bg-tertiary);border-radius:var(--radius-md);padding:16px;grid-column:1/-1">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
+              <div style="font-size:14px;font-weight:700;color:var(--text-secondary)">Admin Control Center</div>
+              <div style="display:flex;gap:8px">
+                <button class="btn" onclick="app.adminOpenApp('docs')"><i class="fas fa-folder-open"></i> Doc Viewer</button>
+                <button class="btn" onclick="app.adminOpenApp('social')"><i class="fas fa-hashtag"></i> Social</button>
+                <button class="btn" onclick="app.adminOpenApp('chat')"><i class="fas fa-comments"></i> Chat</button>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:12px">
+                <div style="font-size:13px;font-weight:700;margin-bottom:10px">Create Account</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <input id="adminNewUsername" class="search-input" placeholder="username">
+                  <input id="adminNewPassword" class="search-input" placeholder="password">
+                  <select id="adminNewRole" class="search-input" style="padding:10px 12px">
+                    <option value="admin">Admin</option>
+                    <option value="slave">Slave (Student)</option>
+                    <option value="user">Normal User</option>
+                  </select>
+                  <input id="adminParentAdmin" class="search-input" placeholder="parent admin (for slave)">
+                  <input id="adminDisplayName" class="search-input" style="grid-column:1/-1" placeholder="display name (optional)">
+                </div>
+                <div style="margin-top:10px;display:flex;gap:8px">
+                  <button class="btn btn-primary" onclick="app.adminCreateAccount()"><i class="fas fa-user-plus"></i> Create</button>
+                  <button class="btn" onclick="app.adminRefreshAccounts()"><i class="fas fa-sync-alt"></i> Refresh Accounts</button>
+                </div>
+                <div id="adminAccountsList" style="display:grid;gap:8px;margin-top:12px;max-height:220px;overflow:auto"></div>
+              </div>
+              <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;min-height:320px">
+                <div style="font-size:13px;font-weight:700;margin-bottom:8px">Terminal App</div>
+                <div style="font-size:12px;color:var(--text-muted);line-height:1.5">
+                  Terminal has been moved to the Study Hub for a consistent experience.
+                </div>
+                <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+                  <button class="btn btn-primary" onclick="window.location.href='/'"><i class="fas fa-terminal"></i> Open Terminal in Hub</button>
+                  <button class="btn" onclick="window.open('/', '_blank')"><i class="fas fa-up-right-from-square"></i> Open Hub in New Tab</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ` : '';
+
         el.statsContent.innerHTML = `
           <div style="background:var(--bg-tertiary);border-radius:var(--radius-md);padding:20px;text-align:center">
             <div style="font-size:32px;font-weight:800;background:var(--accent-gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${data.totalFiles}</div>
@@ -6664,7 +7113,15 @@
               <div style="display:flex;align-items:center;gap:6px"><i class="fas fa-file-powerpoint" style="color:#f97316"></i><span style="font-weight:700">${data.pptCount || 0}</span><span style="color:var(--text-muted);font-size:12px">Presentations</span></div>
             </div>
           </div>
+          ${adminTools}
         `;
+
+        if (state.role === 'admin') {
+          bindAdminDashboardEventsOnce();
+          appendAdminTerminalLine('Safe terminal ready. Type "help" for commands.', 'info');
+          appendAdminSandboxLine('Sandbox terminal ready. Type "help".', 'info');
+          refreshAdminAccounts();
+        }
       } catch {}
     }
 
@@ -7253,6 +7710,25 @@
       toggleClassroom,
       openClassroomFile,
       downloadClassroomFile,
+      adminCreateAccount: createManagedAccountFromDashboard,
+      adminRefreshAccounts: refreshAdminAccounts,
+      adminOpenApp: openAdminApp,
+      adminRunSafeCommand: runAdminTerminalCommand,
+      adminRunSandboxCommand: runAdminSandboxCommand,
+      adminRunTerminalFromInput: () => {
+        const input = $('adminTerminalInput');
+        if (!input) return;
+        const value = input.value;
+        input.value = '';
+        runAdminTerminalCommand(value);
+      },
+      adminRunSandboxFromInput: () => {
+        const input = $('adminSandboxInput');
+        if (!input) return;
+        const value = input.value;
+        input.value = '';
+        runAdminSandboxCommand(value);
+      },
       saveDocAsPdf: async (name) => {
         try {
           await saveDocxAsPdf(name);

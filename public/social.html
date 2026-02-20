@@ -164,6 +164,124 @@
     .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted)}
     .empty-state i{font-size:48px;margin-bottom:16px;display:block;opacity:.3}
     .loading-state{text-align:center;padding:40px;color:var(--text-muted)}
+
+    /* ===== 2026 DESKTOP REMASTER ===== */
+    @keyframes socialRiseIn {
+      from { opacity: 0; transform: translateY(14px) scale(.992); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes socialAura {
+      0%, 100% { transform: translate3d(0,0,0) scale(1); opacity: .26; }
+      50% { transform: translate3d(0,-20px,0) scale(1.12); opacity: .46; }
+    }
+    @media (min-width: 980px) {
+      body::before,
+      body::after {
+        content: '';
+        position: fixed;
+        pointer-events: none;
+        z-index: -1;
+        border-radius: 50%;
+        filter: blur(78px);
+        animation: socialAura 12s ease-in-out infinite;
+      }
+      body::before {
+        width: 360px;
+        height: 360px;
+        top: 80px;
+        right: -130px;
+        background: radial-gradient(circle, rgba(139,92,246,.3), rgba(139,92,246,0) 72%);
+      }
+      body::after {
+        width: 330px;
+        height: 330px;
+        left: -120px;
+        bottom: 80px;
+        background: radial-gradient(circle, rgba(56,189,248,.22), rgba(56,189,248,0) 72%);
+        animation-delay: -4.2s;
+      }
+      .top-bar {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        backdrop-filter: blur(18px) saturate(130%);
+        -webkit-backdrop-filter: blur(18px) saturate(130%);
+        border-bottom: 1px solid color-mix(in srgb, var(--border), #c4b5fd 16%);
+        background: color-mix(in srgb, var(--bg-primary), transparent 18%);
+      }
+      .social-layout {
+        max-width: 1220px;
+        gap: 22px;
+        padding: 0 18px;
+      }
+      .main-col {
+        padding-bottom: 48px;
+      }
+      .side-col {
+        width: 340px;
+        top: 76px;
+        max-height: calc(100vh - 96px);
+      }
+      .tab-bar,
+      .compose,
+      .post,
+      .side-card,
+      .modal-box {
+        border-width: 1.5px;
+        box-shadow: 0 14px 30px rgba(2, 6, 23, .17);
+        animation: socialRiseIn .45s ease both;
+      }
+      .tab-bar { animation-delay: .02s; border-radius: 18px; }
+      .compose { animation-delay: .06s; border-radius: 20px; }
+      .post { animation-delay: .1s; border-radius: 20px; }
+      .side-card { border-radius: 18px; }
+      .compose textarea,
+      .search-input,
+      .comment-form input,
+      .modal-box textarea {
+        border-width: 1.5px;
+      }
+      .compose textarea:focus,
+      .search-input:focus,
+      .comment-form input:focus,
+      .modal-box textarea:focus {
+        border-color: color-mix(in srgb, var(--accent-primary), white 22%);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary), transparent 76%);
+      }
+      .post {
+        transition: transform .2s ease, box-shadow .24s ease, border-color .2s ease;
+      }
+      .post:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 38px rgba(2, 6, 23, .24);
+      }
+      .post-media img {
+        transition: transform .22s ease, filter .2s ease;
+      }
+      .post-media img:hover {
+        transform: scale(1.02);
+        filter: saturate(1.04);
+      }
+      .reaction-pill,
+      .add-reaction,
+      .p-action,
+      .follow-btn,
+      .friend-btn {
+        transition: transform .16s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+      }
+      .reaction-pill:hover,
+      .add-reaction:hover,
+      .p-action:hover {
+        transform: translateY(-1px);
+      }
+      .follow-btn:hover,
+      .friend-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 20px rgba(2, 6, 23, .16);
+      }
+      #feedContainer > .post:nth-child(2n) { animation-delay: .14s; }
+      #feedContainer > .post:nth-child(3n) { animation-delay: .18s; }
+    }
   </style>
 </head>
 <body>

@@ -237,6 +237,120 @@
       .sidebar { max-height: 38vh; }
       .msg-col { max-width: 92%; }
     }
+
+    /* ===== 2026 DESKTOP REMASTER ===== */
+    @keyframes chatIn {
+      from { opacity: 0; transform: translateY(12px) scale(.992); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes chatAmbient {
+      0%, 100% { transform: translate3d(0,0,0) scale(1); opacity: .28; }
+      50% { transform: translate3d(0,-16px,0) scale(1.1); opacity: .48; }
+    }
+    @media (min-width: 980px) {
+      body::before,
+      body::after {
+        content: '';
+        position: fixed;
+        pointer-events: none;
+        z-index: -1;
+        border-radius: 50%;
+        filter: blur(78px);
+        animation: chatAmbient 10.5s ease-in-out infinite;
+      }
+      body::before {
+        width: 340px;
+        height: 340px;
+        top: 74px;
+        right: -120px;
+        background: radial-gradient(circle, rgba(56,189,248,.26), rgba(56,189,248,0) 72%);
+      }
+      body::after {
+        width: 350px;
+        height: 350px;
+        left: -120px;
+        bottom: 74px;
+        background: radial-gradient(circle, rgba(16,185,129,.2), rgba(16,185,129,0) 72%);
+        animation-delay: -3.8s;
+      }
+      .top-bar {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        backdrop-filter: blur(18px) saturate(130%);
+        -webkit-backdrop-filter: blur(18px) saturate(130%);
+        border-bottom: 1px solid color-mix(in srgb, var(--border), #7dd3fc 18%);
+        background: color-mix(in srgb, var(--bg-primary), transparent 18%);
+      }
+      .chat-wrap {
+        max-width: 1440px;
+        grid-template-columns: 360px minmax(0, 1fr);
+        gap: 18px;
+        padding: 18px;
+      }
+      .panel {
+        border-width: 1.5px;
+        border-radius: 20px;
+        box-shadow: 0 16px 34px rgba(2, 6, 23, .2);
+        animation: chatIn .45s ease both;
+      }
+      .sidebar { animation-delay: .03s; }
+      .chat-main { animation-delay: .08s; }
+      .sidebar-head,
+      .chat-head {
+        border-bottom: 1.5px solid var(--border);
+      }
+      .search-box input,
+      .compose-row textarea {
+        border-width: 1.5px;
+      }
+      .search-box input:focus,
+      .compose-row textarea:focus {
+        border-color: color-mix(in srgb, var(--accent-primary), white 20%);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary), transparent 76%);
+        outline: none;
+      }
+      .contact {
+        border-left: 2px solid transparent;
+        transition: background .18s ease, border-color .18s ease, transform .18s ease;
+      }
+      .contact:hover {
+        transform: translateX(2px);
+      }
+      .contact.active {
+        border-left-color: var(--accent-primary);
+      }
+      .messages {
+        padding: 18px;
+        gap: 14px;
+      }
+      .bubble {
+        box-shadow: 0 8px 20px rgba(2, 6, 23, .12);
+      }
+      .mine .bubble {
+        box-shadow: 0 12px 26px color-mix(in srgb, var(--accent-primary), transparent 72%);
+      }
+      .file-card {
+        border-width: 1.5px;
+        border-radius: 12px;
+        transition: transform .18s ease, box-shadow .2s ease;
+      }
+      .file-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 24px rgba(2, 6, 23, .18);
+      }
+      .tool-btn,
+      .send-btn {
+        transition: transform .16s ease, box-shadow .2s ease, filter .2s ease;
+      }
+      .tool-btn:hover,
+      .send-btn:hover {
+        transform: translateY(-1px);
+      }
+      .send-btn:hover {
+        box-shadow: 0 10px 24px color-mix(in srgb, var(--accent-primary), transparent 68%);
+      }
+    }
   </style>
 </head>
 <body>
@@ -324,8 +438,41 @@
       audioChunks: [],
       typing: false,
       lastSeenAt: null,
-      typingTimer: null
+      typingTimer: null,
+      prevUnreadMap: {}
     };
+
+    // ═══ DM NOTIFICATION SOUND ═══
+    let _audioCtx = null;
+    function playNotificationSound() {
+      try {
+        if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = _audioCtx;
+        const now = ctx.currentTime;
+        // Two-tone chime
+        [880, 1174.66].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.18, now + i * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.12);
+          osc.stop(now + i * 0.12 + 0.3);
+        });
+      } catch {}
+    }
+    function checkNewUnreads() {
+      let hasNew = false;
+      for (const c of state.contacts) {
+        const prev = state.prevUnreadMap[c.username] || 0;
+        if (c.unreadCount > prev && c.username !== state.selected) hasNew = true;
+        state.prevUnreadMap[c.username] = c.unreadCount;
+      }
+      if (hasNew) playNotificationSound();
+    }
 
     function getToken() { return localStorage.getItem('authToken'); }
     function authHeaders(extra = {}) { const h = { ...extra }; const t = getToken(); if (t) h.Authorization = 'Bearer ' + t; return h; }
@@ -691,6 +838,7 @@
         setInterval(async () => {
           try {
             await loadContacts();
+            checkNewUnreads();
             if (state.selected) await loadMessages();
           } catch {}
         }, 5000);

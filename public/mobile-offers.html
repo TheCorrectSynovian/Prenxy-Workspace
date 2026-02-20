@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="liquid-glass">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Prenxy Offers</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    .wrap { padding: 16px; max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    .desc { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+    .resource-grid { display: grid; gap: 10px; }
+    .resource-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; }
+    .rc-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; margin-bottom: 8px; }
+    .rc-desc { font-size: 12px; color: var(--text-muted); }
+    .rc-badge { display: inline-block; margin-top: 7px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; }
+    .hot { background: rgba(239,68,68,.15); color: var(--danger); }
+    .free { background: rgba(59,130,246,.15); color: var(--info); }
+    .active { background: rgba(16,185,129,.15); color: var(--success); }
+    .footer { padding: 14px 16px 30px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="top-bar"><div class="left"><a class="logo-link" href="/"><i class="fas fa-atom"></i> Prenxy</a></div><div class="right"><a class="btn" href="/"><i class="fas fa-arrow-left"></i> Hub</a></div></div>
+  <main class="wrap">
+    <h1><i class="fas fa-tags"></i> Offers & Plans</h1>
+    <p class="desc">Student plans, bundles, and promo deals.</p>
+    <div class="resource-grid">
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#ec4899,#db2777)"><i class="fas fa-star"></i></div><h4>Prenxy Pro — Student</h4><div class="rc-desc">Unlimited storage + priority support. <strong>$4.99/mo</strong>.</div><span class="rc-badge hot">50% Off</span></div>
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)"><i class="fas fa-chalkboard-teacher"></i></div><h4>Classroom Bundle</h4><div class="rc-desc">10 student licenses, shared drive, group chat.</div><span class="rc-badge free">Best Value</span></div>
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#10b981,#059669)"><i class="fas fa-laptop-code"></i></div><h4>Free Tier</h4><div class="rc-desc">500 MB storage and basic app access.</div><span class="rc-badge free">Free</span></div>
+    </div>
+  </main>
+  <div class="footer"><a href="/offers.html?desktop=1">Switch to desktop version</a></div>
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'liquid-glass');</script>
+</body>
+</html>

@@ -12,6 +12,7 @@ const { execFile } = require('child_process');
 
 const app = express();
 const PORT = 3000;
+const WEB_RESTART_ENABLED = String(process.env.ALLOW_WEB_RESTART || '').toLowerCase() === 'true';
 const execFileAsync = promisify(execFile);
 const CONVERT_TEMP_DIR = path.join(os.tmpdir(), 'prenxy-convert-cache');
 
@@ -33,6 +34,48 @@ const STAGING_DIR = path.join(INTERNAL_ROOT, '.staging');
 const MEDIA_DIR = path.join(INTERNAL_ROOT, '.media');
 const CHAT_ATTACHMENTS_DIR = path.join(INTERNAL_ROOT, '.chat_attachments');
 const CLASSROOM_FILE = path.join(INTERNAL_ROOT, '.classroom.enc');
+const ACTION_LOG_FILE = path.join(INTERNAL_ROOT, '.actions.log');
+
+function logInfo(message) {
+  const ts = new Date().toISOString();
+  console.log(`[${ts}] INFO  ${message}`);
+}
+
+function logWarn(message) {
+  const ts = new Date().toISOString();
+  console.warn(`[${ts}] WARN  ${message}`);
+}
+
+function logError(message) {
+  const ts = new Date().toISOString();
+  console.error(`[${ts}] ERROR ${message}`);
+}
+
+function writeActionLog(action, details = {}, actor = 'system') {
+  try {
+    if (!fs.existsSync(INTERNAL_ROOT)) fs.mkdirSync(INTERNAL_ROOT, { recursive: true });
+    const row = {
+      timestamp: new Date().toISOString(),
+      actor,
+      action,
+      details
+    };
+    fs.appendFileSync(ACTION_LOG_FILE, JSON.stringify(row) + '\n', 'utf8');
+  } catch (e) {
+    logWarn(`Action log write failed: ${e.message}`);
+  }
+}
+
+function readActionLogs(limit = 50) {
+  if (!fs.existsSync(ACTION_LOG_FILE)) return [];
+  const raw = fs.readFileSync(ACTION_LOG_FILE, 'utf8');
+  const lines = raw.split('\n').filter(Boolean);
+  const parsed = [];
+  for (const line of lines) {
+    try { parsed.push(JSON.parse(line)); } catch {}
+  }
+  return parsed.slice(-Math.max(1, Math.min(Number(limit) || 50, 500)));
+}
 
 // ═══════ Crypto helpers ═══════
 const PBKDF2_ITERATIONS = 100000;
@@ -194,6 +237,50 @@ function getAdminOf(username) {
   return u ? (u.createdBy || null) : null;
 }
 
+function normalizeAccountUsername(username) {
+  return String(username || '').toLowerCase().trim();
+}
+
+function isValidAccountUsername(username) {
+  return /^[a-z0-9][a-z0-9._-]{2,31}$/.test(username);
+}
+
+function normalizeAccountRole(role) {
+  const r = String(role || 'user').toLowerCase().trim();
+  if (r === 'slave') return 'student';
+  if (['admin', 'student', 'user'].includes(r)) return r;
+  return null;
+}
+
+function createAccountWithRole({ username, password, role = 'user', createdBy = null, displayName = null, handle = null }) {
+  const uid = normalizeAccountUsername(username);
+  if (!isValidAccountUsername(uid)) {
+    return { success: false, error: 'Invalid username. Use 3-32 chars: a-z, 0-9, dot, underscore, hyphen' };
+  }
+  if (!password || String(password).length < 4) {
+    return { success: false, error: 'Password must be at least 4 characters' };
+  }
+  const normalizedRole = normalizeAccountRole(role);
+  if (!normalizedRole) return { success: false, error: 'Invalid role. Use admin, slave/student, or user' };
+
+  const result = createAccount(uid, String(password));
+  if (!result.success) return result;
+
+  const users = loadUsers();
+  users[uid].role = normalizedRole;
+  users[uid].createdBy = createdBy ? normalizeAccountUsername(createdBy) : null;
+  users[uid].displayName = (displayName || uid).substring(0, 50);
+  users[uid].handle = (handle || ('@' + uid.replace(/[^a-z0-9_]/g, ''))).substring(0, 50);
+  saveUsers(users);
+  writeActionLog('account.create', {
+    username: uid,
+    role: normalizedRole,
+    createdBy: users[uid].createdBy || null
+  }, createdBy || 'system');
+
+  return { success: true, username: uid, role: normalizedRole, folderHash: result.folderHash };
+}
+
 function createAccount(username, password) {
   const users = loadUsers();
   const uid = username.toLowerCase().trim();
@@ -219,6 +306,7 @@ function deleteAccount(username) {
   if (!users[uid]) return { success: false, error: 'Account not found' };
   delete users[uid];
   saveUsers(users);
+  writeActionLog('account.delete', { username: uid }, 'system');
   return { success: true };
 }
 
@@ -271,6 +359,29 @@ setInterval(() => {
     if (now - session.createdAt > SESSION_TTL) sessions.delete(token);
   }
 }, 60 * 60 * 1000);
+
+// ═══════ Sole-account admin enforcement ═══════
+// If exactly one account exists, force it to admin regardless of its current role.
+function enforceSoleAccountAdmin() {
+  const users = loadUsers();
+  const uids = Object.keys(users);
+  if (uids.length !== 1) return;
+  const uid = uids[0];
+  const currentRole = users[uid].role || 'user';
+  if (currentRole === 'admin') return; // already admin
+  users[uid].role = 'admin';
+  saveUsers(users);
+  // Also update any active session for this user
+  for (const [, session] of sessions) {
+    if (session.username === uid) session.role = 'admin';
+  }
+  logInfo(`Sole account "${uid}" promoted to admin (was "${currentRole}")`);
+  writeActionLog('account.auto-promote', { username: uid, previousRole: currentRole, reason: 'sole_account' }, 'system');
+}
+
+// Run on startup and check every 30 seconds
+enforceSoleAccountAdmin();
+setInterval(enforceSoleAccountAdmin, 30 * 1000);
 
 // ═══════ Initialize storage ═══════
 if (!fs.existsSync(INTERNAL_ROOT)) fs.mkdirSync(INTERNAL_ROOT, { recursive: true });
@@ -353,6 +464,33 @@ function getUserUpload(req) {
 
 app.use(cors());
 app.use(express.json());
+
+// ═══════ Mobile auto-detection middleware ═══════
+// Automatically serves mobile-optimised HTML when a mobile browser is detected.
+// The detection runs server-side via User-Agent so no manual toggle is needed.
+const MOBILE_UA_RE = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i;
+const MOBILE_PAGE_MAP = {
+  '/':            '/mobile-index.html',
+  '/index.html':  '/mobile-index.html',
+  '/chat.html':   '/mobile-chat.html',
+  '/social.html': '/mobile-social.html',
+  '/drive.html':  '/mobile-drive.html',
+  '/vm.html':     '/mobile-vm.html',
+  '/offers.html': '/mobile-offers.html',
+  '/resources.html': '/mobile-resources.html',
+};
+app.use((req, res, next) => {
+  // Skip if the client explicitly opts out (?desktop=1)
+  if (req.query.desktop === '1') return next();
+  const ua = req.headers['user-agent'] || '';
+  const mobilePath = MOBILE_PAGE_MAP[req.path];
+  if (mobilePath && MOBILE_UA_RE.test(ua)) {
+    const absPath = path.join(__dirname, 'public', mobilePath);
+    if (fs.existsSync(absPath)) return res.sendFile(absPath);
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 function isUnsafeName(name) {
@@ -787,19 +925,670 @@ app.get('/api/avatars/:filename', (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 //  ADMIN APIs
 // ════════════════════════════════════════════════════════════════════════════
+function splitCommandLine(input) {
+  const out = [];
+  const re = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|(\S+)/g;
+  const line = String(input || '').trim();
+  let m;
+  while ((m = re.exec(line)) !== null) out.push((m[1] || m[2] || m[3] || '').replace(/\\(["'])/g, '$1'));
+  return out;
+}
+
+function maskSensitiveCommand(input) {
+  const parts = splitCommandLine(input);
+  const cmd = (parts[0] || '').toLowerCase();
+  const masked = [...parts];
+  const maskAt = (idx) => { if (masked[idx]) masked[idx] = '***'; };
+  if (['create-account', 'create-admin', 'create-user', 'reset-password'].includes(cmd)) maskAt(2);
+  if (['create-slave', 'create-student'].includes(cmd)) maskAt(3);
+  return masked.join(' ');
+}
+
+function canManageAccount(actorUsername, actorRole, targetUsername, users) {
+  if (!users[targetUsername]) return false;
+  if (targetUsername === actorUsername) return false;
+  if (actorRole !== 'admin') return false;
+  const target = users[targetUsername];
+  const targetRole = target.role || 'user';
+  if (targetRole === 'admin') return target.createdBy === actorUsername;
+  return target.createdBy === actorUsername;
+}
+
+function runSafeAdminCommand(actor, commandLine) {
+  const users = loadUsers();
+  const parts = splitCommandLine(commandLine);
+  const cmd = (parts[0] || '').toLowerCase();
+  const actorUsername = normalizeAccountUsername(actor.username || '');
+  const actorRole = actor.role || 'user';
+  const isCli = actor.source === 'cli';
+  const isAdminActor = isCli || actorRole === 'admin';
+
+  if (!cmd) return { success: true, output: '' };
+
+  if (cmd === 'help') {
+    return {
+      success: true,
+      output: [
+        'Safe commands:',
+        '  help',
+        '  whoami',
+        '  list-accounts [mine|all]',
+        '  list-slaves [adminUsername]',
+        '  create-admin <username> <password>',
+        '  create-slave <adminUsername> <username> <password>',
+        '  create-user <username> <password>',
+        '  set-role <username> <admin|slave|student|user> [adminUsernameForSlave]',
+        '  reset-password <username> <new-password>',
+        '  delete-account <username>',
+        '  show-logs [count]'
+      ].join('\n')
+    };
+  }
+
+  if (cmd === 'whoami') {
+    return { success: true, output: `username=${actorUsername || 'cli'} role=${isCli ? 'root-cli' : actorRole}` };
+  }
+
+  if (!isAdminActor) return { success: false, output: 'Only admins can run management commands.' };
+
+  if (cmd === 'list-accounts') {
+    const scope = (parts[1] || 'mine').toLowerCase();
+    const rows = Object.entries(users)
+      .filter(([u, data]) => isCli || scope === 'all' || data.createdBy === actorUsername || u === actorUsername)
+      .map(([u, data]) => ({
+        username: u,
+        role: data.role || 'user',
+        createdBy: data.createdBy || '-',
+        createdAt: (data.createdAt || '').slice(0, 19)
+      }))
+      .sort((a, b) => a.username.localeCompare(b.username));
+    if (rows.length === 0) return { success: true, output: 'No accounts found.' };
+    return {
+      success: true,
+      output: rows.map(r => `${r.username}\trole=${r.role}\tcreatedBy=${r.createdBy}\tcreatedAt=${r.createdAt}`).join('\n'),
+      data: rows
+    };
+  }
+
+  if (cmd === 'list-slaves') {
+    const adminUser = normalizeAccountUsername(parts[1] || actorUsername);
+    const rows = Object.entries(users)
+      .filter(([, data]) => (data.role || 'user') === 'student' && data.createdBy === adminUser)
+      .map(([u, data]) => ({ username: u, createdAt: data.createdAt || null }))
+      .sort((a, b) => a.username.localeCompare(b.username));
+    return { success: true, output: rows.length ? rows.map(r => `${r.username}\tcreatedAt=${(r.createdAt || '').slice(0, 19)}`).join('\n') : 'No slave/student accounts found.', data: rows };
+  }
+
+  if (cmd === 'create-admin') {
+    if (parts.length < 3) return { success: false, output: 'Usage: create-admin <username> <password>' };
+    const createdBy = isCli ? null : actorUsername;
+    const result = createAccountWithRole({ username: parts[1], password: parts[2], role: 'admin', createdBy });
+    return result.success
+      ? { success: true, output: `Created admin account: ${result.username}`, data: result }
+      : { success: false, output: result.error };
+  }
+
+  if (cmd === 'create-slave' || cmd === 'create-student') {
+    if (parts.length < 4) return { success: false, output: 'Usage: create-slave <adminUsername> <username> <password>' };
+    const parentAdmin = normalizeAccountUsername(parts[1]);
+    const parent = users[parentAdmin];
+    if (!parent || (parent.role || 'user') !== 'admin') return { success: false, output: `Admin not found: ${parentAdmin}` };
+    const result = createAccountWithRole({ username: parts[2], password: parts[3], role: 'student', createdBy: parentAdmin });
+    return result.success
+      ? { success: true, output: `Created slave/student account: ${result.username} under ${parentAdmin}`, data: result }
+      : { success: false, output: result.error };
+  }
+
+  if (cmd === 'create-user') {
+    if (parts.length < 3) return { success: false, output: 'Usage: create-user <username> <password>' };
+    const result = createAccountWithRole({ username: parts[1], password: parts[2], role: 'user', createdBy: isCli ? null : actorUsername });
+    return result.success
+      ? { success: true, output: `Created user account: ${result.username}`, data: result }
+      : { success: false, output: result.error };
+  }
+
+  if (cmd === 'set-role') {
+    if (parts.length < 3) return { success: false, output: 'Usage: set-role <username> <admin|slave|student|user> [adminUsernameForSlave]' };
+    const target = normalizeAccountUsername(parts[1]);
+    const role = normalizeAccountRole(parts[2]);
+    if (!role) return { success: false, output: 'Invalid role.' };
+    if (!users[target]) return { success: false, output: `Account not found: ${target}` };
+    if (!isCli && !canManageAccount(actorUsername, actorRole, target, users)) return { success: false, output: 'You cannot manage that account.' };
+    users[target].role = role;
+    if (role === 'student') {
+      const adminOwner = normalizeAccountUsername(parts[3] || users[target].createdBy || actorUsername);
+      if (!users[adminOwner] || (users[adminOwner].role || 'user') !== 'admin') return { success: false, output: 'A valid admin owner is required for slave/student role.' };
+      users[target].createdBy = adminOwner;
+    }
+    saveUsers(users);
+    writeActionLog('account.set-role', { username: target, role, createdBy: users[target].createdBy || null }, actorUsername || 'cli');
+    return { success: true, output: `Role for ${target} set to ${role}` };
+  }
+
+  if (cmd === 'reset-password') {
+    if (parts.length < 3) return { success: false, output: 'Usage: reset-password <username> <new-password>' };
+    const target = normalizeAccountUsername(parts[1]);
+    if (!users[target]) return { success: false, output: `Account not found: ${target}` };
+    if (!isCli && !canManageAccount(actorUsername, actorRole, target, users)) return { success: false, output: 'You cannot manage that account.' };
+    if (!parts[2] || parts[2].length < 4) return { success: false, output: 'New password must be at least 4 characters.' };
+    const { hash, salt } = hashPassword(parts[2]);
+    users[target].passwordHash = hash;
+    users[target].salt = salt;
+    saveUsers(users);
+    writeActionLog('account.reset-password', { username: target }, actorUsername || 'cli');
+    return { success: true, output: `Password reset for: ${target}` };
+  }
+
+  if (cmd === 'delete-account') {
+    if (parts.length < 2) return { success: false, output: 'Usage: delete-account <username>' };
+    const target = normalizeAccountUsername(parts[1]);
+    if (!users[target]) return { success: false, output: `Account not found: ${target}` };
+    if (!isCli && !canManageAccount(actorUsername, actorRole, target, users)) return { success: false, output: 'You cannot manage that account.' };
+    delete users[target];
+    saveUsers(users);
+    writeActionLog('account.delete', { username: target, via: 'safe-command' }, actorUsername || 'cli');
+    return { success: true, output: `Deleted account: ${target}` };
+  }
+
+  if (cmd === 'show-logs') {
+    const count = Math.max(1, Math.min(parseInt(parts[1], 10) || 20, 200));
+    const logs = readActionLogs(count);
+    if (!logs.length) return { success: true, output: 'No action logs yet.' };
+    const out = logs.map(l => {
+      const d = l.details && typeof l.details === 'object' ? JSON.stringify(l.details) : '{}';
+      return `${l.timestamp}\t${l.actor}\t${l.action}\t${d}`;
+    }).join('\n');
+    return { success: true, output: out, data: logs };
+  }
+
+  return { success: false, output: `Unknown safe command: ${cmd}. Type "help".` };
+}
+
+const adminSandboxSessions = new Map(); // username -> { cwdRel: '/', history: [] }
+
+function sanitizeBaseName(name) {
+  return String(name || '').replace(/[<>:"|?*]/g, '').trim();
+}
+
+function safeResolveSandboxPath(rootDir, cwdRel, inputPath = '.') {
+  const raw = String(inputPath || '.').trim();
+  const joined = raw.startsWith('/') ? raw : path.posix.join(cwdRel || '/', raw);
+  const normalizedRel = path.posix.normalize('/' + joined).replace(/^\/+/, '/');
+  const absolute = path.resolve(rootDir, '.' + normalizedRel);
+  const normalizedRoot = path.resolve(rootDir);
+  if (!(absolute === normalizedRoot || absolute.startsWith(normalizedRoot + path.sep))) {
+    throw new Error('Path escapes sandbox root');
+  }
+  return { absolute, rel: normalizedRel };
+}
+
+function ensureAdminSandboxSession(user) {
+  const key = user.username;
+  if (!adminSandboxSessions.has(key)) adminSandboxSessions.set(key, { cwdRel: '/', history: [] });
+  return adminSandboxSessions.get(key);
+}
+
+function runAdminSandboxCommand(reqUser, commandLine) {
+  const parts = splitCommandLine(commandLine);
+  const cmd = (parts[0] || '').toLowerCase();
+  const users = loadUsers();
+  const me = users[reqUser.username];
+  if (!me) return { success: false, output: 'User not found.' };
+  const rootDir = path.join(INTERNAL_ROOT, me.folderHash);
+  if (!fs.existsSync(rootDir)) fs.mkdirSync(rootDir, { recursive: true });
+
+  const session = ensureAdminSandboxSession(reqUser);
+  let cwdRel = session.cwdRel || '/';
+  if (!cmd) return { success: true, output: '', cwd: cwdRel };
+  session.history = Array.isArray(session.history) ? session.history : [];
+  session.history.push({
+    ts: new Date().toISOString(),
+    command: String(commandLine || '').trim()
+  });
+  if (session.history.length > 200) session.history = session.history.slice(-200);
+
+  const getTarget = (p) => safeResolveSandboxPath(rootDir, cwdRel, p || '.');
+  const readTextFile = (absolutePath) => fs.readFileSync(absolutePath, 'utf8');
+  const limitItems = (arr, max = 400) => arr.slice(0, max);
+
+  if (cmd === 'help') {
+    return {
+      success: true,
+      cwd: cwdRel,
+      output: [
+        'Sandbox commands:',
+        '  help, pwd, clear',
+        '  history [count]',
+        '  ls [path], cd <path>',
+        '  tree [path] [depth], du [path]',
+        '  cat <file>, head <file> [lines], tail <file> [lines]',
+        '  wc <file>, stat <path>',
+        '  grep <file> <text>, findname [path] <query>',
+        '  touch <file>, mkdir <dir>',
+        '  write <file> <text>',
+        '  append <file> <text>',
+        '  rm <path>, mv <src> <dest>, cp <src> <dest>'
+      ].join('\n')
+    };
+  }
+
+  if (cmd === 'pwd') return { success: true, cwd: cwdRel, output: cwdRel };
+  if (cmd === 'clear') return { success: true, cwd: cwdRel, output: '__CLEAR__' };
+  if (cmd === 'history') {
+    const n = Math.max(1, Math.min(parseInt(parts[1], 10) || 20, 200));
+    const rows = session.history.slice(-n);
+    if (!rows.length) return { success: true, cwd: cwdRel, output: '(no history)' };
+    return { success: true, cwd: cwdRel, output: rows.map((r, idx) => `${idx + 1}. ${r.command}`).join('\n') };
+  }
+
+  if (cmd === 'cd') {
+    const target = getTarget(parts[1] || '/');
+    if (!fs.existsSync(target.absolute)) return { success: false, cwd: cwdRel, output: 'No such directory' };
+    if (!fs.statSync(target.absolute).isDirectory()) return { success: false, cwd: cwdRel, output: 'Not a directory' };
+    session.cwdRel = target.rel;
+    return { success: true, cwd: session.cwdRel, output: session.cwdRel };
+  }
+
+  if (cmd === 'ls') {
+    const target = getTarget(parts[1] || '.');
+    if (!fs.existsSync(target.absolute)) return { success: false, cwd: cwdRel, output: 'Path not found' };
+    const st = fs.statSync(target.absolute);
+    if (st.isFile()) return { success: true, cwd: cwdRel, output: sanitizeBaseName(path.basename(target.absolute)) };
+    const entries = fs.readdirSync(target.absolute, { withFileTypes: true })
+      .sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name))
+      .map(e => `${e.isDirectory() ? '[DIR] ' : '      '}${sanitizeBaseName(e.name)}`);
+    return { success: true, cwd: cwdRel, output: entries.length ? entries.join('\n') : '(empty)' };
+  }
+
+  if (cmd === 'cat' || cmd === 'head') {
+    if (!parts[1]) return { success: false, cwd: cwdRel, output: `Usage: ${cmd} <file>${cmd === 'head' ? ' [lines]' : ''}` };
+    const target = getTarget(parts[1]);
+    if (!fs.existsSync(target.absolute)) return { success: false, cwd: cwdRel, output: 'File not found' };
+    if (!fs.statSync(target.absolute).isFile()) return { success: false, cwd: cwdRel, output: 'Not a file' };
+    const content = readTextFile(target.absolute);
+    if (cmd === 'head') {
+      const n = Math.max(1, Math.min(parseInt(parts[2], 10) || 20, 200));
+      return { success: true, cwd: cwdRel, output: content.split('\n').slice(0, n).join('\n') };
+    }
+    return { success: true, cwd: cwdRel, output: content.slice(0, 20000) };
+  }
+
+  if (cmd === 'tail') {
+    if (!parts[1]) return { success: false, cwd: cwdRel, output: 'Usage: tail <file> [lines]' };
+    const target = getTarget(parts[1]);
+    if (!fs.existsSync(target.absolute)) return { success: false, cwd: cwdRel, output: 'File not found' };
+    if (!fs.statSync(target.absolute).isFile()) return { success: false, cwd: cwdRel, output: 'Not a file' };
+    const content = readTextFile(target.absolute);
+    const n = Math.max(1, Math.min(parseInt(parts[2], 10) || 20, 400));
+    const lines = content.split('\n');
+    return { success: true, cwd: cwdRel, output: lines.slice(Math.max(0, lines.length - n)).join('\n') };
+  }
+
+  if (cmd === 'wc') {
+    if (!parts[1]) return { success: false, cwd: cwdRel, output: 'Usage: wc <file>' };
+    const target = getTarget(parts[1]);
+    if (!fs.existsSync(target.absolute)) return { success: false, cwd: cwdRel, output: 'File not found' };
+    if (!fs.statSync(target.absolute).isFile()) return { success: false, cwd: cwdRel, output: 'Not a file' };
+    const content = readTextFile(target.absolute);
+    const lines = content === '' ? 0 : content.split('\n').length;
+    const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+    const bytes = Buffer.byteLength(content, 'utf8');
+    return { success: true, cwd: cwdRel, output: `lines=${lines} words=${words} bytes=${bytes}` };
+  }
+
+  if (cmd === 'stat') {
+    if (!parts[1]) return { success: false, cwd: cwdRel, output: 'Usage: stat <path>' };
+    const target = getTarget(parts[1]);
+    if (!fs.existsSync(target.absolute)) return { success: false, cwd: cwdRel, output: 'Path not found' };
+    const st = fs.statSync(target.absolute);
+    return {
+      success: true,
+      cwd: cwdRel,
+      output: [
+        `path=${target.rel}`,
+        `type=${st.isDirectory() ? 'directory' : 'file'}`,
+        `size=${st.size}`,
+        `modified=${st.mtime.toISOString()}`,
+        `created=${st.birthtime.toISOString()}`
+      ].join('\n')
+    };
+  }
+
+  if (cmd === 'grep') {
+    if (!parts[1] || !parts[2]) return { success: false, cwd: cwdRel, output: 'Usage: grep <file> <text>' };
+    const target = getTarget(parts[1]);
+    if (!fs.existsSync(target.absolute)) return { success: false, cwd: cwdRel, output: 'File not found' };
+    if (!fs.statSync(target.absolute).isFile()) return { success: false, cwd: cwdRel, output: 'Not a file' };
+    const query = parts.slice(2).join(' ').toLowerCase();
+    const lines = readTextFile(target.absolute).split('\n');
+    const hits = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].toLowerCase().includes(query)) hits.push(`${i + 1}: ${lines[i]}`);
+      if (hits.length >= 200) break;
+    }
+    return { success: true, cwd: cwdRel, output: hits.length ? hits.join('\n') : '(no matches)' };
+  }
+
+  if (cmd === 'findname') {
+    if (!parts[1]) return { success: false, cwd: cwdRel, output: 'Usage: findname [path] <query>' };
+    let basePathArg = '.';
+    let query = '';
+    if (parts.length === 2) query = parts[1];
+    else {
+      basePathArg = parts[1];
+      query = parts.slice(2).join(' ');
+    }
+    query = query.toLowerCase();
+    if (!query) return { success: false, cwd: cwdRel, output: 'Query is required' };
+    const base = getTarget(basePathArg);
+    if (!fs.existsSync(base.absolute)) return { success: false, cwd: cwdRel, output: 'Path not found' };
+    const out = [];
+    const walk = (abs, rel, depth = 0) => {
+      if (out.length >= 500 || depth > 8) return;
+      const entries = fs.readdirSync(abs, { withFileTypes: true });
+      for (const entry of entries) {
+        const name = sanitizeBaseName(entry.name);
+        const childAbs = path.join(abs, entry.name);
+        const childRel = path.posix.join(rel, name).replace(/\\/g, '/');
+        if (name.toLowerCase().includes(query)) out.push((entry.isDirectory() ? '[DIR] ' : '      ') + childRel);
+        if (entry.isDirectory()) walk(childAbs, childRel, depth + 1);
+        if (out.length >= 500) break;
+      }
+    };
+    if (fs.statSync(base.absolute).isDirectory()) walk(base.absolute, base.rel);
+    else if (path.basename(base.absolute).toLowerCase().includes(query)) out.push(base.rel);
+    return { success: true, cwd: cwdRel, output: out.length ? out.join('\n') : '(no matches)' };
+  }
+
+  if (cmd === 'tree') {
+    const target = getTarget(parts[1] || '.');
+    if (!fs.existsSync(target.absolute)) return { success: false, cwd: cwdRel, output: 'Path not found' };
+    const depthLimit = Math.max(1, Math.min(parseInt(parts[2], 10) || 3, 8));
+    const lines = [];
+    if (!fs.statSync(target.absolute).isDirectory()) {
+      lines.push(target.rel);
+      return { success: true, cwd: cwdRel, output: lines.join('\n') };
+    }
+    const walk = (abs, rel, depth, prefix) => {
+      if (depth > depthLimit || lines.length > 500) return;
+      const entries = fs.readdirSync(abs, { withFileTypes: true })
+        .sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name));
+      const limited = limitItems(entries, 120);
+      for (let i = 0; i < limited.length; i++) {
+        const entry = limited[i];
+        const isLast = i === limited.length - 1;
+        const marker = isLast ? '└─ ' : '├─ ';
+        const name = sanitizeBaseName(entry.name);
+        lines.push(prefix + marker + name + (entry.isDirectory() ? '/' : ''));
+        if (entry.isDirectory()) {
+          walk(path.join(abs, entry.name), path.posix.join(rel, name), depth + 1, prefix + (isLast ? '   ' : '│  '));
+        }
+      }
+    };
+    lines.push(target.rel + '/');
+    walk(target.absolute, target.rel, 1, '');
+    return { success: true, cwd: cwdRel, output: lines.join('\n') };
+  }
+
+  if (cmd === 'du') {
+    const target = getTarget(parts[1] || '.');
+    if (!fs.existsSync(target.absolute)) return { success: false, cwd: cwdRel, output: 'Path not found' };
+    const calcSize = (abs, depth = 0) => {
+      if (depth > 20) return 0;
+      const st = fs.statSync(abs);
+      if (st.isFile()) return st.size;
+      let total = 0;
+      const entries = fs.readdirSync(abs, { withFileTypes: true });
+      for (const entry of entries) {
+        total += calcSize(path.join(abs, entry.name), depth + 1);
+      }
+      return total;
+    };
+    if (fs.statSync(target.absolute).isFile()) {
+      return { success: true, cwd: cwdRel, output: `${target.rel}\t${calcSize(target.absolute)} bytes` };
+    }
+    const rows = [];
+    const entries = fs.readdirSync(target.absolute, { withFileTypes: true });
+    for (const entry of limitItems(entries, 200)) {
+      const childAbs = path.join(target.absolute, entry.name);
+      const childRel = path.posix.join(target.rel, sanitizeBaseName(entry.name));
+      rows.push(`${childRel}${entry.isDirectory() ? '/' : ''}\t${calcSize(childAbs)} bytes`);
+    }
+    const total = calcSize(target.absolute);
+    rows.push(`TOTAL\t${total} bytes`);
+    return { success: true, cwd: cwdRel, output: rows.join('\n') };
+  }
+
+  if (cmd === 'touch') {
+    if (!parts[1]) return { success: false, cwd: cwdRel, output: 'Usage: touch <file>' };
+    const target = getTarget(parts[1]);
+    const parent = path.dirname(target.absolute);
+    if (!fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
+    if (!fs.existsSync(target.absolute)) fs.writeFileSync(target.absolute, '', 'utf8');
+    return { success: true, cwd: cwdRel, output: `Touched ${target.rel}` };
+  }
+
+  if (cmd === 'mkdir') {
+    if (!parts[1]) return { success: false, cwd: cwdRel, output: 'Usage: mkdir <dir>' };
+    const target = getTarget(parts[1]);
+    fs.mkdirSync(target.absolute, { recursive: true });
+    return { success: true, cwd: cwdRel, output: `Created ${target.rel}` };
+  }
+
+  if (cmd === 'write' || cmd === 'append') {
+    if (!parts[1]) return { success: false, cwd: cwdRel, output: `Usage: ${cmd} <file> <text>` };
+    const target = getTarget(parts[1]);
+    const text = parts.slice(2).join(' ');
+    if (!text) return { success: false, cwd: cwdRel, output: 'Text is required' };
+    const parent = path.dirname(target.absolute);
+    if (!fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
+    if (cmd === 'write') fs.writeFileSync(target.absolute, text + '\n', 'utf8');
+    else fs.appendFileSync(target.absolute, text + '\n', 'utf8');
+    return { success: true, cwd: cwdRel, output: `${cmd === 'write' ? 'Wrote' : 'Appended'} ${target.rel}` };
+  }
+
+  if (cmd === 'rm') {
+    if (!parts[1]) return { success: false, cwd: cwdRel, output: 'Usage: rm <path>' };
+    const target = getTarget(parts[1]);
+    if (!fs.existsSync(target.absolute)) return { success: false, cwd: cwdRel, output: 'Path not found' };
+    fs.rmSync(target.absolute, { recursive: true, force: true });
+    return { success: true, cwd: cwdRel, output: `Removed ${target.rel}` };
+  }
+
+  if (cmd === 'mv' || cmd === 'cp') {
+    if (!parts[1] || !parts[2]) return { success: false, cwd: cwdRel, output: `Usage: ${cmd} <src> <dest>` };
+    const src = getTarget(parts[1]);
+    const dest = getTarget(parts[2]);
+    if (!fs.existsSync(src.absolute)) return { success: false, cwd: cwdRel, output: 'Source not found' };
+    const parent = path.dirname(dest.absolute);
+    if (!fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
+    if (cmd === 'mv') {
+      fs.renameSync(src.absolute, dest.absolute);
+    } else {
+      const srcStat = fs.statSync(src.absolute);
+      if (srcStat.isDirectory()) fs.cpSync(src.absolute, dest.absolute, { recursive: true });
+      else fs.copyFileSync(src.absolute, dest.absolute);
+    }
+    return { success: true, cwd: cwdRel, output: `${cmd === 'mv' ? 'Moved' : 'Copied'} to ${dest.rel}` };
+  }
+
+  return { success: false, cwd: cwdRel, output: `Unknown command: ${cmd}. Type "help".` };
+}
+
 app.post('/api/admin/create-user', authRequired, adminRequired, (req, res) => {
   const { username, password, displayName } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-  const result = createAccount(username, password);
+  const result = createAccountWithRole({
+    username, password,
+    role: 'student',
+    createdBy: req.user.username,
+    displayName: displayName || username
+  });
   if (!result.success) return res.status(400).json({ error: result.error });
+  res.json({ success: true, username: result.username, folderHash: result.folderHash });
+});
+
+app.get('/api/admin/accounts', authRequired, adminRequired, (req, res) => {
   const users = loadUsers();
-  const uid = username.toLowerCase().trim();
-  users[uid].role = 'student';
-  users[uid].createdBy = req.user.username;
-  users[uid].displayName = displayName || username;
-  users[uid].handle = '@' + uid.replace(/[^a-z0-9_]/g, '');
+  const scope = String(req.query.scope || 'mine').toLowerCase();
+  const list = Object.entries(users)
+    .filter(([u, data]) => scope === 'all' || data.createdBy === req.user.username || u === req.user.username)
+    .map(([u, data]) => ({
+      username: u,
+      role: data.role || 'user',
+      displayName: data.displayName || u,
+      createdBy: data.createdBy || null,
+      createdAt: data.createdAt || null
+    }))
+    .sort((a, b) => a.username.localeCompare(b.username));
+  res.json(list);
+});
+
+app.post('/api/admin/accounts', authRequired, adminRequired, (req, res) => {
+  const { username, password, role, displayName, parentAdmin } = req.body || {};
+  if (!username || !password || !role) return res.status(400).json({ error: 'username, password and role are required' });
+
+  const normalizedRole = normalizeAccountRole(role);
+  if (!normalizedRole) return res.status(400).json({ error: 'Role must be admin, slave/student, or user' });
+
+  const users = loadUsers();
+  let createdBy = req.user.username;
+  if (normalizedRole === 'student') {
+    const owner = normalizeAccountUsername(parentAdmin || req.user.username);
+    const ownerData = users[owner];
+    if (!ownerData || (ownerData.role || 'user') !== 'admin') {
+      return res.status(400).json({ error: 'parentAdmin must be a valid admin username' });
+    }
+    createdBy = owner;
+  }
+  if (normalizedRole === 'admin' || normalizedRole === 'user') {
+    createdBy = req.user.username;
+  }
+
+  const result = createAccountWithRole({ username, password, role: normalizedRole, createdBy, displayName });
+  if (!result.success) return res.status(400).json({ error: result.error });
+  res.json({ success: true, account: { username: result.username, role: result.role, createdBy } });
+});
+
+app.delete('/api/admin/accounts/:username', authRequired, adminRequired, (req, res) => {
+  const target = normalizeAccountUsername(req.params.username);
+  const users = loadUsers();
+  if (!users[target]) return res.status(404).json({ error: 'User not found' });
+  if (!canManageAccount(req.user.username, req.user.role, target, users)) {
+    return res.status(403).json({ error: 'You can only delete accounts you created (excluding your own account)' });
+  }
+  delete users[target];
   saveUsers(users);
-  res.json({ success: true, username: uid, folderHash: result.folderHash });
+  res.json({ success: true });
+});
+
+app.post('/api/admin/terminal/execute', authRequired, adminRequired, (req, res) => {
+  const command = String((req.body && req.body.command) || '').trim();
+  if (!command) return res.status(400).json({ error: 'Command is required' });
+  const result = runSafeAdminCommand({ username: req.user.username, role: req.user.role, source: 'web' }, command);
+  writeActionLog('admin.terminal.execute', {
+    command: maskSensitiveCommand(command),
+    success: !!result.success
+  }, req.user.username);
+  res.status(result.success ? 200 : 400).json(result);
+});
+
+app.post('/api/admin/sandbox/execute', authRequired, adminRequired, (req, res) => {
+  const command = String((req.body && req.body.command) || '').trim();
+  if (!command) return res.status(400).json({ error: 'Command is required' });
+  let result;
+  try {
+    result = runAdminSandboxCommand(req.user, command);
+  } catch (e) {
+    result = { success: false, output: `Sandbox error: ${e.message}` };
+  }
+  writeActionLog('admin.sandbox.execute', {
+    command: maskSensitiveCommand(command),
+    success: !!result.success,
+    cwd: result.cwd || null
+  }, req.user.username);
+  res.status(result.success ? 200 : 400).json(result);
+});
+
+app.get('/api/admin/sandbox/file', authRequired, adminRequired, (req, res) => {
+  const users = loadUsers();
+  const me = users[req.user.username];
+  if (!me) return res.status(404).json({ error: 'User not found' });
+  const rootDir = path.join(INTERNAL_ROOT, me.folderHash);
+  if (!fs.existsSync(rootDir)) fs.mkdirSync(rootDir, { recursive: true });
+  const session = ensureAdminSandboxSession(req.user);
+  const inputPath = String(req.query.path || '').trim();
+  if (!inputPath) return res.status(400).json({ error: 'path is required' });
+  let target;
+  try {
+    target = safeResolveSandboxPath(rootDir, session.cwdRel || '/', inputPath);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+  if (!fs.existsSync(target.absolute)) return res.status(404).json({ error: 'File not found' });
+  if (!fs.statSync(target.absolute).isFile()) return res.status(400).json({ error: 'Path is not a file' });
+  const content = fs.readFileSync(target.absolute, 'utf8');
+  res.json({ success: true, path: target.rel, content: content.slice(0, 1024 * 1024) });
+});
+
+app.put('/api/admin/sandbox/file', authRequired, adminRequired, (req, res) => {
+  const users = loadUsers();
+  const me = users[req.user.username];
+  if (!me) return res.status(404).json({ error: 'User not found' });
+  const rootDir = path.join(INTERNAL_ROOT, me.folderHash);
+  if (!fs.existsSync(rootDir)) fs.mkdirSync(rootDir, { recursive: true });
+  const session = ensureAdminSandboxSession(req.user);
+  const inputPath = String((req.body && req.body.path) || '').trim();
+  if (!inputPath) return res.status(400).json({ error: 'path is required' });
+  const content = String((req.body && req.body.content) || '');
+  if (Buffer.byteLength(content, 'utf8') > 1024 * 1024) {
+    return res.status(400).json({ error: 'Editor content too large (max 1 MB)' });
+  }
+  let target;
+  try {
+    target = safeResolveSandboxPath(rootDir, session.cwdRel || '/', inputPath);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+  const parent = path.dirname(target.absolute);
+  if (!fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
+  fs.writeFileSync(target.absolute, content, 'utf8');
+  writeActionLog('admin.sandbox.file.save', { path: target.rel, bytes: Buffer.byteLength(content, 'utf8') }, req.user.username);
+  res.json({ success: true, path: target.rel });
+});
+
+app.get('/api/admin/system/status', authRequired, adminRequired, (req, res) => {
+  const mem = process.memoryUsage();
+  res.json({
+    pid: process.pid,
+    platform: process.platform,
+    nodeVersion: process.version,
+    uptimeMs: Date.now() - stats.startTime,
+    restartEnabled: WEB_RESTART_ENABLED,
+    rssBytes: mem.rss,
+    heapTotalBytes: mem.heapTotal,
+    heapUsedBytes: mem.heapUsed,
+    externalBytes: mem.external
+  });
+});
+
+app.get('/api/admin/system/logs', authRequired, adminRequired, (req, res) => {
+  const count = Math.max(1, Math.min(parseInt(req.query.count, 10) || 30, 200));
+  const logs = readActionLogs(count);
+  res.json({ success: true, logs });
+});
+
+app.post('/api/admin/system/restart', authRequired, adminRequired, (req, res) => {
+  if (!WEB_RESTART_ENABLED) {
+    return res.status(400).json({
+      error: 'Restart disabled. Set ALLOW_WEB_RESTART=true and run under pm2/systemd/docker restart policy.'
+    });
+  }
+  writeActionLog('admin.system.restart', { via: 'web', by: req.user.username }, req.user.username);
+  res.json({ success: true, message: 'Restart signal accepted. Server will exit now.' });
+  setTimeout(() => {
+    process.exit(0);
+  }, 250);
 });
 
 app.get('/api/admin/users', authRequired, adminRequired, (req, res) => {
@@ -1839,8 +2628,12 @@ function getLocalIP() {
 // ════════════════════════════════════════════════════════════════════════════
 //  CLI COMMANDS — run with: node server.js <command> [args]
 //    create-account <username> <password>
+//    create-admin <username> <password>
+//    create-slave <adminUsername> <username> <password>
+//    create-user <username> <password>
 //    delete-account <username>
 //    list-accounts
+//    list-slaves [adminUsername]
 //    reset-password <username> <new-password>
 //    migrate-documents [target-username]
 // ════════════════════════════════════════════════════════════════════════════
@@ -1848,48 +2641,91 @@ const args = process.argv.slice(2);
 
 if (args.length > 0) {
   const command = args[0];
+  writeActionLog('cli.command', { command: maskSensitiveCommand(args.join(' ')) }, 'cli');
 
   switch (command) {
     case 'create-account': {
       if (args.length < 3) { console.error('Usage: node server.js create-account <username> <password>'); process.exit(1); }
-      const result = createAccount(args[1], args[2]);
+      const result = createAccountWithRole({ username: args[1], password: args[2], role: 'user' });
       if (result.success) {
-        console.log(`\u2705 Account created: ${args[1]}`);
-        console.log(`   Folder hash: ${result.folderHash}`);
-        console.log(`   Storage: .internal_root/${result.folderHash}/`);
+        logInfo(`Account created: ${result.username} (role=${result.role})`);
+        logInfo(`Storage path: .internal_root/${result.folderHash}/`);
       } else {
-        console.error(`\u274c ${result.error}`);
+        logError(result.error);
       }
       process.exit(0);
+    }
+
+    case 'create-admin': {
+      if (args.length < 3) { console.error('Usage: node server.js create-admin <username> <password>'); process.exit(1); }
+      const result = createAccountWithRole({ username: args[1], password: args[2], role: 'admin' });
+      if (result.success) logInfo(`Admin account created: ${result.username}`);
+      else logError(result.error);
+      process.exit(result.success ? 0 : 1);
+    }
+
+    case 'create-slave': {
+      if (args.length < 4) { console.error('Usage: node server.js create-slave <adminUsername> <username> <password>'); process.exit(1); }
+      const users = loadUsers();
+      const parentAdmin = normalizeAccountUsername(args[1]);
+      if (!users[parentAdmin] || (users[parentAdmin].role || 'user') !== 'admin') {
+        logError(`Admin not found: ${parentAdmin}`);
+        process.exit(1);
+      }
+      const result = createAccountWithRole({ username: args[2], password: args[3], role: 'student', createdBy: parentAdmin });
+      if (result.success) logInfo(`Slave/student account created: ${result.username} (admin=${parentAdmin})`);
+      else logError(result.error);
+      process.exit(result.success ? 0 : 1);
+    }
+
+    case 'create-user': {
+      if (args.length < 3) { console.error('Usage: node server.js create-user <username> <password>'); process.exit(1); }
+      const result = createAccountWithRole({ username: args[1], password: args[2], role: 'user' });
+      if (result.success) logInfo(`User account created: ${result.username}`);
+      else logError(result.error);
+      process.exit(result.success ? 0 : 1);
     }
 
     case 'delete-account': {
       if (args.length < 2) { console.error('Usage: node server.js delete-account <username>'); process.exit(1); }
       const result = deleteAccount(args[1]);
       if (result.success) {
-        console.log(`\u2705 Account deleted: ${args[1]}`);
-        console.log('   Note: User files were NOT deleted. Remove folder manually if needed.');
+        logInfo(`Account deleted: ${args[1]}`);
+        logWarn('User files are not deleted automatically.');
       } else {
-        console.error(`\u274c ${result.error}`);
+        logError(result.error);
       }
       process.exit(0);
     }
 
     case 'list-accounts': {
       const accounts = listAccounts();
-      if (accounts.length === 0) { console.log('No accounts found.'); }
-      else {
-        console.log(`\n  \ud83d\udccb Registered Accounts (${accounts.length}):\n`);
-        console.log('  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510');
-        console.log('  \u2502 Username                     \u2502 Role             \u2502 Created                  \u2502');
-        console.log('  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524');
-        for (const acc of accounts) {
-          const u = acc.username.padEnd(28);
-          const r = (acc.role || 'user').padEnd(16);
-          const c = (acc.createdAt || 'unknown').substring(0, 24).padEnd(24);
-          console.log(`  \u2502 ${u} \u2502 ${r} \u2502 ${c} \u2502`);
-        }
-        console.log('  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518');
+      if (accounts.length === 0) { logInfo('No accounts found.'); }
+      else accounts.forEach(acc => logInfo(`${acc.username} role=${acc.role || 'user'} createdAt=${acc.createdAt || 'unknown'}`));
+      process.exit(0);
+    }
+
+    case 'list-slaves': {
+      const users = loadUsers();
+      const adminUser = normalizeAccountUsername(args[1] || '');
+      const rows = Object.entries(users)
+        .filter(([u, data]) => (data.role || 'user') === 'student' && (!adminUser || data.createdBy === adminUser))
+        .map(([u, data]) => ({ username: u, createdBy: data.createdBy || '-', createdAt: data.createdAt || '' }))
+        .sort((a, b) => a.username.localeCompare(b.username));
+      if (!rows.length) logInfo('No slave/student accounts found.');
+      else rows.forEach(r => logInfo(`${r.username} admin=${r.createdBy} createdAt=${r.createdAt}`));
+      process.exit(0);
+    }
+
+    case 'show-logs': {
+      const count = Math.max(1, Math.min(parseInt(args[1], 10) || 30, 300));
+      const logs = readActionLogs(count);
+      if (!logs.length) {
+        logInfo('No action logs yet.');
+      } else {
+        logs.forEach(item => {
+          console.log(`${item.timestamp} actor=${item.actor} action=${item.action} details=${JSON.stringify(item.details || {})}`);
+        });
       }
       process.exit(0);
     }
@@ -1903,7 +2739,8 @@ if (args.length > 0) {
       users[uid].passwordHash = hash;
       users[uid].salt = salt;
       saveUsers(users);
-      console.log(`\u2705 Password reset for: ${uid}`);
+      writeActionLog('account.reset-password', { username: uid }, 'cli');
+      logInfo(`Password reset for: ${uid}`);
       process.exit(0);
     }
 
@@ -1939,26 +2776,34 @@ if (args.length > 0) {
     }
 
     case 'set-role': {
-      if (args.length < 3) { console.error('Usage: node server.js set-role <username> <admin|student|user>'); process.exit(1); }
+      if (args.length < 3) { console.error('Usage: node server.js set-role <username> <admin|slave|student|user>'); process.exit(1); }
       const users = loadUsers();
       const uid = args[1].toLowerCase().trim();
-      const role = args[2].toLowerCase().trim();
-      if (!['admin', 'student', 'user'].includes(role)) { console.error('❌ Role must be: admin, student, or user'); process.exit(1); }
+      const role = normalizeAccountRole(args[2]);
+      if (!role) { console.error('❌ Role must be: admin, slave/student, or user'); process.exit(1); }
       if (!users[uid]) { console.error(`❌ Account not found: ${args[1]}`); process.exit(1); }
       users[uid].role = role;
+      if (role === 'student' && args[3]) users[uid].createdBy = normalizeAccountUsername(args[3]);
       saveUsers(users);
-      console.log(`✅ Role set to "${role}" for: ${uid}`);
+      writeActionLog('account.set-role', { username: uid, role, createdBy: users[uid].createdBy || null }, 'cli');
+      logInfo(`Role set: ${uid} -> ${role}`);
       process.exit(0);
     }
 
     default:
+      writeActionLog('cli.command.unknown', { command }, 'cli');
       console.error(`Unknown command: ${command}`);
       console.log('\nAvailable commands:');
       console.log('  create-account <username> <password>');
+      console.log('  create-admin <username> <password>');
+      console.log('  create-slave <adminUsername> <username> <password>');
+      console.log('  create-user <username> <password>');
       console.log('  delete-account <username>');
       console.log('  list-accounts');
+      console.log('  list-slaves [adminUsername]');
+      console.log('  show-logs [count]');
       console.log('  reset-password <username> <new-password>');
-      console.log('  set-role <username> <admin|student|user>');
+      console.log('  set-role <username> <admin|slave|student|user> [adminUsernameForSlave]');
       console.log('  migrate-documents [target-username]');
       console.log('\nTo start the server, run: node server.js');
       process.exit(1);
@@ -1969,21 +2814,26 @@ if (args.length > 0) {
 app.listen(PORT, '0.0.0.0', () => {
   const localIP = getLocalIP();
   const accounts = listAccounts();
-  console.log('');
-  console.log('  \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557');
-  console.log('  \u2551                                                       \u2551');
-  console.log('  \u2551   \u269b\ufe0f  Prenxy PDF+ Document Manager & Viewer            \u2551');
-  console.log('  \u2551                                                       \u2551');
-  console.log(`  \u2551   \ud83c\udf10  Local:    http://localhost:${PORT}                  \u2551`);
-  console.log(`  \u2551   \ud83d\udce1  Network:  http://${localIP}:${PORT}               \u2551`);
-  console.log(`  \u2551   \ud83d\udcc2  ${INTERNAL_ROOT}`);
-  console.log(`  \u2551   \ud83d\udd10  Accounts: ${accounts.length} registered                    \u2551`);
-  console.log('  \u2551                                                       \u2551');
-  console.log('  \u2551   CLI commands:                                       \u2551');
-  console.log('  \u2551     node server.js create-account <user> <pass>       \u2551');
-  console.log('  \u2551     node server.js list-accounts                      \u2551');
-  console.log('  \u2551     node server.js migrate-documents [user]           \u2551');
-  console.log('  \u2551                                                       \u2551');
-  console.log('  \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d');
-  console.log('');
+  logInfo('Prenxy server started');
+  logInfo(`Local URL   : http://localhost:${PORT}`);
+  logInfo(`Network URL : http://${localIP}:${PORT}`);
+  logInfo(`Storage root: ${INTERNAL_ROOT}`);
+  logInfo(`Accounts    : ${accounts.length}`);
+  logInfo('CLI quick commands:');
+  logInfo('  node server.js list-accounts');
+  logInfo('  node server.js create-admin <username> <password>');
+  logInfo('  node server.js show-logs 30');
+  writeActionLog('server.start', {
+    port: PORT,
+    local: `http://localhost:${PORT}`,
+    network: `http://${localIP}:${PORT}`,
+    accounts: accounts.length
+  }, 'system');
+  const recent = readActionLogs(5);
+  if (recent.length) {
+    logInfo('Recent actions:');
+    recent.forEach(item => {
+      console.log(`${item.timestamp} actor=${item.actor} action=${item.action} details=${JSON.stringify(item.details || {})}`);
+    });
+  }
 });

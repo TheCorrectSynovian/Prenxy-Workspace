@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="liquid-glass">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prenxy VM</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    body { min-height: 100vh; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 18px 40px; }
+    .head { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 16px; }
+    .head h1 { font-size: 26px; }
+    .desc { color: var(--text-muted); margin-bottom: 20px; }
+    .resource-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .resource-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; }
+    .rc-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; margin-bottom: 10px; }
+    .resource-card h4 { margin-bottom: 6px; }
+    .resource-card .rc-desc { font-size: 13px; color: var(--text-muted); line-height: 1.45; }
+    .rc-badge { display: inline-block; margin-top: 10px; padding: 3px 8px; font-size: 10px; border-radius: 999px; text-transform: uppercase; font-weight: 700; }
+    .rc-badge.active { background: rgba(16,185,129,.15); color: var(--success); }
+    .rc-badge.coming { background: rgba(245,158,11,.15); color: var(--warning); }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div class="left"><a class="logo-link" href="/"><i class="fas fa-atom"></i> Prenxy</a></div>
+    <div class="right"><a class="btn" href="/"><i class="fas fa-arrow-left"></i> Hub</a></div>
+  </div>
+  <main class="wrap">
+    <div class="head"><h1><i class="fas fa-cubes"></i> VM Workspaces</h1></div>
+    <p class="desc">Launch cloud virtual machines for coding, testing, and project work.</p>
+    <div class="resource-grid">
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#f97316,#ea580c)"><i class="fab fa-ubuntu"></i></div><h4>Ubuntu 24.04 LTS</h4><div class="rc-desc">VS Code, Python 3.12, Node 20, GCC. 2 vCPU / 4 GB RAM.</div><span class="rc-badge active">Available</span></div>
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)"><i class="fab fa-windows"></i></div><h4>Windows 11 Dev</h4><div class="rc-desc">Visual Studio 2024, .NET 9, Office 365. 2 vCPU / 8 GB RAM.</div><span class="rc-badge coming">Coming Soon</span></div>
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#10b981,#059669)"><i class="fab fa-python"></i></div><h4>Python Data Science</h4><div class="rc-desc">Jupyter, Pandas, NumPy, Matplotlib, TensorFlow. 4 vCPU / 8 GB RAM.</div><span class="rc-badge active">Available</span></div>
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)"><i class="fab fa-java"></i></div><h4>Java Spring Boot</h4><div class="rc-desc">OpenJDK 21, Maven, Gradle, Docker. 2 vCPU / 4 GB RAM.</div><span class="rc-badge coming">Coming Soon</span></div>
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2)"><i class="fab fa-react"></i></div><h4>Web Dev Starter</h4><div class="rc-desc">Node 20, React, Next.js, Tailwind CSS. 2 vCPU / 4 GB RAM.</div><span class="rc-badge active">Available</span></div>
+      <div class="resource-card"><div class="rc-icon" style="background:linear-gradient(135deg,#64748b,#334155)"><i class="fas fa-database"></i></div><h4>Database Sandbox</h4><div class="rc-desc">PostgreSQL 16, MySQL 8, MongoDB 7, Redis. 2 vCPU / 4 GB RAM.</div><span class="rc-badge active">Available</span></div>
+    </div>
+  </main>
+  <script>
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'liquid-glass');
+  </script>
+</body>
+</html>

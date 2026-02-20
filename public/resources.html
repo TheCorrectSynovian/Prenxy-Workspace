@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="liquid-glass">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prenxy Student Resources</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 18px 40px; }
+    .head h1 { font-size: 26px; margin-bottom: 8px; }
+    .desc { color: var(--text-muted); margin-bottom: 16px; }
+    .section-tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .section-tab { padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); cursor: pointer; }
+    .section-tab.active { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; }
+    .resource-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .resource-card, .classroom-file { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; }
+    .rc-icon, .cf-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; margin-bottom: 10px; }
+    .rc-desc, .cf-meta { font-size: 13px; color: var(--text-muted); }
+    .rc-badge { display: inline-block; margin-top: 8px; padding: 3px 8px; font-size: 10px; border-radius: 999px; text-transform: uppercase; font-weight: 700; background: rgba(59,130,246,.15); color: var(--info); }
+    .classroom-files { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .cf-name { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div class="left"><a class="logo-link" href="/"><i class="fas fa-atom"></i> Prenxy</a></div>
+    <div class="right"><a class="btn" href="/"><i class="fas fa-arrow-left"></i> Hub</a></div>
+  </div>
+  <main class="wrap">
+    <div class="head"><h1><i class="fas fa-graduation-cap"></i> Student Resources</h1></div>
+    <p class="desc">Study guides, quick references, and classroom resources.</p>
+    <div class="section-tabs">
+      <button class="section-tab active" onclick="showResourceTab('classroom',this)">Classroom</button>
+      <button class="section-tab" onclick="showResourceTab('guides',this)">Study Guides</button>
+      <button class="section-tab" onclick="showResourceTab('references',this)">Quick Refs</button>
+      <button class="section-tab" onclick="showResourceTab('tools',this)">Tools</button>
+    </div>
+
+    <div class="resource-tab" id="tab-classroom">
+      <div class="classroom-files">
+        <div class="classroom-file"><div class="cf-name">Course Syllabus — Spring 2026.pdf</div><div class="cf-meta">PDF · 245 KB · Feb 14, 2026</div></div>
+        <div class="classroom-file"><div class="cf-name">Week 7 — Data Structures Slides.pptx</div><div class="cf-meta">PPTX · 3.2 MB · Feb 18, 2026</div></div>
+        <div class="classroom-file"><div class="cf-name">Assignment 3 — Sorting Algorithms.zip</div><div class="cf-meta">ZIP · 128 KB · Due Mar 1, 2026</div></div>
+        <div class="classroom-file"><div class="cf-name">Lab — Binary Trees Walkthrough.mp4</div><div class="cf-meta">MP4 · 156 MB · Feb 12, 2026</div></div>
+      </div>
+    </div>
+
+    <div class="resource-tab" id="tab-guides" style="display:none">
+      <div class="resource-grid">
+        <div class="resource-card"><h4>Algorithms Cheat Sheet</h4><div class="rc-desc">Big-O, sorting, graph traversals, DP patterns.</div><span class="rc-badge">Free</span></div>
+        <div class="resource-card"><h4>SQL Mastery Guide</h4><div class="rc-desc">JOINs, windows, indexing, optimization.</div><span class="rc-badge">Free</span></div>
+        <div class="resource-card"><h4>Python Quick Start</h4><div class="rc-desc">Control flow, OOP, file I/O, useful libs.</div><span class="rc-badge">Free</span></div>
+      </div>
+    </div>
+
+    <div class="resource-tab" id="tab-references" style="display:none">
+      <div class="resource-grid">
+        <div class="resource-card"><h4>HTML/CSS Reference</h4><div class="rc-desc">Tags, Flexbox, Grid, responsive patterns.</div><span class="rc-badge">Free</span></div>
+        <div class="resource-card"><h4>Math Formulas</h4><div class="rc-desc">Calculus, linear algebra, probability, stats.</div><span class="rc-badge">Free</span></div>
+        <div class="resource-card"><h4>Keyboard Shortcuts</h4><div class="rc-desc">VS Code, Git, terminal, browser devtools.</div><span class="rc-badge">Free</span></div>
+      </div>
+    </div>
+
+    <div class="resource-tab" id="tab-tools" style="display:none">
+      <div class="resource-grid">
+        <div class="resource-card"><h4>Code Formatter</h4><div class="rc-desc">Auto-format Python, JS, Java and C++.</div><span class="rc-badge">Online</span></div>
+        <div class="resource-card"><h4>Pomodoro Timer</h4><div class="rc-desc">25/5 and 50/10 focus cycles.</div><span class="rc-badge">Coming Soon</span></div>
+      </div>
+    </div>
+  </main>
+  <script>
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'liquid-glass');
+    function showResourceTab(tab, btn) {
+      document.querySelectorAll('.resource-tab').forEach(t => t.style.display = 'none');
+      document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+      const el = document.getElementById('tab-' + tab);
+      if (el) el.style.display = '';
+      if (btn) btn.classList.add('active');
+    }
+  </script>
+</body>
+</html>
