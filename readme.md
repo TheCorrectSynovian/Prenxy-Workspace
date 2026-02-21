@@ -1,4 +1,4 @@
-# qc_doccss_manager
+# VIEW PRENXY OPENSOURCE DOCSX 
 
 Web app for the Prenxy study hub with:
 - Drive, Chat, and Social apps
